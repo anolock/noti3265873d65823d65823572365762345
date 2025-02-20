@@ -1,6 +1,7 @@
 import requests
 import os
-import json  # ✅ FEHLER BEHOBEN: Importiert JSON für Telegram-Button
+import json
+import time  # ✅ WICHTIG für die 5-Minuten-Pause
 
 # ✅ Lade Secrets aus GitHub Actions
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
@@ -66,7 +67,7 @@ def send_discord_notification(album_name, release_date, spotify_url, cover_url):
     
     requests.post(DISCORD_WEBHOOK_URL, json=embed, headers={"Content-Type": "application/json"})
 
-# 🔥 Funktion: Telegram-Benachrichtigung mit einem **richtigen Button**
+# 🔥 Funktion: Telegram-Benachrichtigung mit Button
 def send_telegram_notification(album_name, release_date, spotify_url, cover_url):
     print("📢 Sending Telegram notification...")
 
@@ -93,7 +94,7 @@ def send_telegram_notification(album_name, release_date, spotify_url, cover_url)
     else:
         print(f"⚠️ Telegram image upload failed: {response.text}")
 
-    # 🎶 Inline-Button zu Spotify (Kein extra Text, direkter Button!)
+    # 🎶 Inline-Button zu Spotify
     keyboard = {
         "inline_keyboard": [[{"text": "🎶 Listen on Spotify", "url": spotify_url}]]
     }
@@ -111,25 +112,31 @@ def send_telegram_notification(album_name, release_date, spotify_url, cover_url)
     else:
         print(f"⚠️ Telegram button failed: {response.text}")
 
-# ✅ Prüfe auf neue Releases & sende **nur, wenn es wirklich neu ist**
-album_name, release_date, spotify_url, cover_url = check_new_release()
+# ✅ Start Loop (läuft dauerhaft)
+while True:
+    print("🔄 Running release check loop...")
+    
+    album_name, release_date, spotify_url, cover_url = check_new_release()
 
-if album_name:
-    last_release_file = "last_release.txt"
+    if album_name:
+        last_release_file = "last_release.txt"
 
-    if os.path.exists(last_release_file):
-        with open(last_release_file, "r") as f:
-            last_release = f.read().strip()
-    else:
-        last_release = None
+        if os.path.exists(last_release_file):
+            with open(last_release_file, "r") as f:
+                last_release = f.read().strip()
+        else:
+            last_release = None
 
-    if album_name != last_release:
-        print(f"🎉 New release found: {album_name}")
+        if album_name != last_release:
+            print(f"🎉 New release found: {album_name}")
 
-        send_discord_notification(album_name, release_date, spotify_url, cover_url)
-        send_telegram_notification(album_name, release_date, spotify_url, cover_url)
+            send_discord_notification(album_name, release_date, spotify_url, cover_url)
+            send_telegram_notification(album_name, release_date, spotify_url, cover_url)
 
-        with open(last_release_file, "w") as f:
-            f.write(album_name)
-    else:
-        print("😴 No new releases found.")
+            with open(last_release_file, "w") as f:
+                f.write(album_name)
+        else:
+            print("😴 No new releases found.")
+
+    # 🕒 Warte 5 Minuten, bevor erneut geprüft wird
+    time.sleep(300)
