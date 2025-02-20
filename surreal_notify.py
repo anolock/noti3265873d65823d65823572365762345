@@ -65,22 +65,51 @@ def send_discord_notification(album_name, release_date, spotify_url, cover_url):
     
     requests.post(DISCORD_WEBHOOK_URL, json=embed, headers={"Content-Type": "application/json"})
 
-# 🔥 Funktion: Telegram-Benachrichtigung mit Button
+# 🔥 Function: Send Telegram Notification (Optimized)
 def send_telegram_notification(album_name, release_date, spotify_url, cover_url):
-    base_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+    print("📢 Sending Telegram notification...")
 
-    # 🔹 Schritt 1: Bild + Infos senden
-    caption = (
+    base_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+    
+    # 📸 Send image with caption (title & release date in one message)
+    message_text = (
         f"🔥 **New Surreal.wav Release!** 🎧\n\n"
         f"🎵 *{album_name}*\n"
         f"📅 **Release Date:** {release_date}"
     )
-    requests.post(f"{base_url}/sendPhoto", data={
+
+    payload = {
         "chat_id": TELEGRAM_CHAT_ID,
         "photo": cover_url,
-        "caption": caption,
+        "caption": message_text,
         "parse_mode": "Markdown"
-    })
+    }
+    
+    response = requests.post(f"{base_url}/sendPhoto", data=payload)
+    
+    if response.status_code == 200:
+        print("✅ Telegram image + caption sent successfully!")
+    else:
+        print(f"⚠️ Telegram image upload failed: {response.text}")
+
+    # 🔘 Add an inline button to Spotify
+    keyboard = {
+        "inline_keyboard": [[{"text": "🎶 Listen on Spotify", "url": spotify_url}]]
+    }
+
+    button_payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": "🎵 **Listen on Spotify** 🎶",
+        "reply_markup": json.dumps(keyboard),
+        "parse_mode": "Markdown"
+    }
+    
+    response = requests.post(f"{base_url}/sendMessage", data=button_payload)
+    
+    if response.status_code == 200:
+        print("✅ Telegram button sent successfully!")
+    else:
+        print(f"⚠️ Telegram button failed: {response.text}")
 
     # 🔹 Schritt 2: Spotify Button senden
     requests.post(f"{base_url}/sendMessage", json={
