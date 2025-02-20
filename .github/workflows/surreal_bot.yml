@@ -21,4 +21,6 @@ jobs:
         run: pip install requests
 
       - name: Run Script
-        run: python "mega super hidden path so no one can find it/S/S/S/S/S/S/S/S/surreal_notify.py"
+        run: |
+          cd ${{ github.workspace }}
+          python surreal_notify.py
