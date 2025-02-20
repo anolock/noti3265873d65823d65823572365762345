@@ -1,5 +1,6 @@
 import requests
 import os
+import json  # ✅ FEHLER BEHOBEN: Importiert JSON für Telegram-Button
 
 # ✅ Lade Secrets aus GitHub Actions
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
@@ -65,13 +66,13 @@ def send_discord_notification(album_name, release_date, spotify_url, cover_url):
     
     requests.post(DISCORD_WEBHOOK_URL, json=embed, headers={"Content-Type": "application/json"})
 
-# 🔥 Function: Send Telegram Notification (Optimized)
+# 🔥 Funktion: Telegram-Benachrichtigung mit einem **richtigen Button**
 def send_telegram_notification(album_name, release_date, spotify_url, cover_url):
     print("📢 Sending Telegram notification...")
 
     base_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
     
-    # 📸 Send image with caption (title & release date in one message)
+    # 📸 Bild mit Caption
     message_text = (
         f"🔥 **New Surreal.wav Release!** 🎧\n\n"
         f"🎵 *{album_name}*\n"
@@ -92,16 +93,15 @@ def send_telegram_notification(album_name, release_date, spotify_url, cover_url)
     else:
         print(f"⚠️ Telegram image upload failed: {response.text}")
 
-    # 🔘 Add an inline button to Spotify
+    # 🎶 Inline-Button zu Spotify (Kein extra Text, direkter Button!)
     keyboard = {
         "inline_keyboard": [[{"text": "🎶 Listen on Spotify", "url": spotify_url}]]
     }
 
     button_payload = {
         "chat_id": TELEGRAM_CHAT_ID,
-        "text": "🎵 **Listen on Spotify** 🎶",
         "reply_markup": json.dumps(keyboard),
-        "parse_mode": "Markdown"
+        "text": "⬇️ Click below to stream 🎶"
     }
     
     response = requests.post(f"{base_url}/sendMessage", data=button_payload)
@@ -111,15 +111,7 @@ def send_telegram_notification(album_name, release_date, spotify_url, cover_url)
     else:
         print(f"⚠️ Telegram button failed: {response.text}")
 
-    # 🔹 Schritt 2: Spotify Button senden
-    requests.post(f"{base_url}/sendMessage", json={
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": "🎧 **Stream on Spotify**",
-        "reply_markup": {"inline_keyboard": [[{"text": "🎶 Listen on Spotify", "url": spotify_url}]]},
-        "parse_mode": "Markdown"
-    })
-
-# ✅ Prüfe auf neue Releases & sende nur, wenn es wirklich neu ist
+# ✅ Prüfe auf neue Releases & sende **nur, wenn es wirklich neu ist**
 album_name, release_date, spotify_url, cover_url = check_new_release()
 
 if album_name:
@@ -141,4 +133,3 @@ if album_name:
             f.write(album_name)
     else:
         print("😴 No new releases found.")
-
