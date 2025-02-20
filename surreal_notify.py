@@ -2,6 +2,7 @@ import requests
 import os
 import time
 
+# ✅ Debugging: Zeige ALLE Secrets (außer sensible Daten) an
 print("DEBUGGING ENVIRONMENT VARIABLES:")
 print("DISCORD_WEBHOOK_URL:", os.getenv("DISCORD_WEBHOOK_URL"))
 print("SPOTIFY_CLIENT_ID:", os.getenv("SPOTIFY_CLIENT_ID"))
@@ -9,9 +10,21 @@ print("SPOTIFY_CLIENT_SECRET:", os.getenv("SPOTIFY_CLIENT_SECRET"))
 print("TELEGRAM_BOT_TOKEN:", os.getenv("TELEGRAM_BOT_TOKEN"))
 print("TELEGRAM_CHAT_ID:", os.getenv("TELEGRAM_CHAT_ID"))
 
+# ✅ Lade die Secrets korrekt
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "NOT_FOUND")
+SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", "NOT_FOUND")
+SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "NOT_FOUND")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "NOT_FOUND")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "NOT_FOUND")
+
+# ✅ Debugging: Prüfe, ob Secrets geladen wurden
+print("\nAFTER LOADING SECRETS:")
 print("DISCORD_WEBHOOK_URL:", DISCORD_WEBHOOK_URL)
+print("SPOTIFY_CLIENT_ID:", SPOTIFY_CLIENT_ID)
+print("SPOTIFY_CLIENT_SECRET:", SPOTIFY_CLIENT_SECRET)
 print("TELEGRAM_BOT_TOKEN:", TELEGRAM_BOT_TOKEN)
 print("TELEGRAM_CHAT_ID:", TELEGRAM_CHAT_ID)
+
 
 
 # ✅ Spotify Artist ID für Surreal.wav
