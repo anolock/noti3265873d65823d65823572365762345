@@ -1,0 +1,23 @@
+name: SurrealBot
+on:
+  schedule:
+    - cron: "*/5 * * * *"  # Läuft alle 5 Minuten
+  workflow_dispatch:  # Manuelles Starten möglich
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.x'
+
+      - name: Install Dependencies
+        run: pip install requests
+
+      - name: Run Script
+        run: python surreal_notify.py
