@@ -3,7 +3,7 @@ name: SurrealBot
 on:
   schedule:
     - cron: "*/5 * * * *"  # Runs every 5 minutes
-  workflow_dispatch:  # Allows manual execution
+  workflow_dispatch:  # ✅ Allows manual execution
 
 jobs:
   run-bot:
@@ -21,4 +21,4 @@ jobs:
         run: pip install requests
 
       - name: Run Script
-        run: python surreal_notify.py  # ✅ Runs correctly now
+        run: python surreal_notify.py
