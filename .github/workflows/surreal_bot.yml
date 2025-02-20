@@ -1,8 +1,6 @@
 name: SurrealBot
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"  # Läuft alle 5 Minuten
   workflow_dispatch:  # Ermöglicht manuelles Starten
 
 jobs:
@@ -20,11 +18,15 @@ jobs:
       - name: Install Dependencies
         run: pip install requests
 
-      - name: Run Script
+      - name: Run Script (Permanent)
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python surreal_notify.py
+        run: |
+          while true; do
+            python surreal_notify.py
+            sleep 300  # 5 Minuten warten, bevor erneut geprüft wird
+          done
