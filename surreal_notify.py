@@ -5,6 +5,41 @@ import time
 # ✅ Debugging: Check if environment variables are loaded
 print("🚀 DEBUG: Checking environment variables...")
 
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
+SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", "").strip()
+SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "").strip()
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+
+# 🔥 Check for missing secrets
+missing_secrets = []
+
+if not DISCORD_WEBHOOK_URL or not DISCORD_WEBHOOK_URL.startswith("https://discord.com/api/webhooks/"):
+    missing_secrets.append("DISCORD_WEBHOOK_URL")
+
+if not SPOTIFY_CLIENT_ID:
+    missing_secrets.append("SPOTIFY_CLIENT_ID")
+
+if not SPOTIFY_CLIENT_SECRET:
+    missing_secrets.append("SPOTIFY_CLIENT_SECRET")
+
+if not TELEGRAM_BOT_TOKEN:
+    missing_secrets.append("TELEGRAM_BOT_TOKEN")
+
+if not TELEGRAM_CHAT_ID:
+    missing_secrets.append("TELEGRAM_CHAT_ID")
+
+# 🔴 Falls ein Secret fehlt → Skript abbrechen
+if missing_secrets:
+    print(f"❌ ERROR: Missing required secrets: {', '.join(missing_secrets)}")
+    raise ValueError("Missing required secrets! Check your GitHub repository settings.")
+
+print("✅ Environment variables loaded successfully!")
+
+
+# ✅ Debugging: Check if environment variables are loaded
+print("🚀 DEBUG: Checking environment variables...")
+
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "MISSING_WEBHOOK")
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", "MISSING_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "MISSING_SECRET")
