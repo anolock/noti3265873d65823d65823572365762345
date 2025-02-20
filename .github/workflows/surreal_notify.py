@@ -1,15 +1,11 @@
 import requests
-import time
+import os  # 🛑 Holt Secrets sicher aus GitHub
 
-# ✅ Surreal.wav’s Spotify Artist ID
-ARTIST_ID = "4pqIwzgTlrlpRqHvWvNtVd"
+# ✅ API Keys werden sicher aus GitHub Secrets geladen
+CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
+CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
-# ✅ Your Spotify API Credentials
-CLIENT_ID = "7af4a6b569b544ba983b363d38e837d9"
-CLIENT_SECRET = "c85b3388c9e04cada9f2f0cf5d46ce62"
-
-# ✅ Your Discord Webhook URL (DO NOT SHARE PUBLICLY)
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1342197978516947014/IZzY-ayByZFncJhyVZT_vo_AgArelA1rIka2zdFHfNCDpu4sORojyvgZD3BuKtI4fDDo"
 
 # 🔥 Function to Get a Spotify API Access Token
 def get_spotify_token():
