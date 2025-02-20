@@ -2,6 +2,11 @@ import requests
 import os
 import time
 
+print("DISCORD_WEBHOOK_URL:", DISCORD_WEBHOOK_URL)
+print("TELEGRAM_BOT_TOKEN:", TELEGRAM_BOT_TOKEN)
+print("TELEGRAM_CHAT_ID:", TELEGRAM_CHAT_ID)
+
+
 # ✅ Spotify Artist ID für Surreal.wav
 ARTIST_ID = "4pqIwzgTlrlpRqHvWvNtVd"
 
