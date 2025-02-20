@@ -1,4 +1,5 @@
 name: SurrealBot
+
 on:
   schedule:
     - cron: "*/5 * * * *"  # Läuft alle 5 Minuten
@@ -20,4 +21,4 @@ jobs:
         run: pip install requests
 
       - name: Run Script
-        run: python surreal_notify.py
+        run: python surreal_notify.py  # Sicherstellen, dass das Skript im Root-Ordner liegt
