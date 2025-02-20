@@ -1,11 +1,17 @@
 import requests
-import os  # 🛑 Holt Secrets sicher aus GitHub
+import os
+import time  # 🕒 Needed for the loop
 
-# ✅ API Keys werden sicher aus GitHub Secrets geladen
+# ✅ Surreal.wav’s Spotify Artist ID
+ARTIST_ID = "4pqIwzgTlrlpRqHvWvNtVd"
+
+# ✅ API Keys (Securely loaded from GitHub Secrets)
 CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
+# ✅ Role ID for @🔔 ⋄ Notification ⋄
+ROLE_ID = "1342206955745317005"
 
 # 🔥 Function to Get a Spotify API Access Token
 def get_spotify_token():
@@ -42,7 +48,7 @@ def check_new_release():
 # 🔥 Function to Send a Discord Notification
 def send_discord_notification(album_name, release_date, spotify_url, cover_url):
     embed = {
-        "content": "@everyone 🚀 **Surreal.wav just dropped a new track!** 🎶",
+        "content": f"<@&{ROLE_ID}> 🚀 **Surreal.wav just dropped a new track!** 🎶",
         "embeds": [
             {
                 "title": album_name,
