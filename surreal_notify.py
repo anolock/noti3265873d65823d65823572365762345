@@ -1,16 +1,33 @@
-import requests
 import os
+import requests
 import time
 
-# ✅ Spotify Artist ID for Surreal.wav
-ARTIST_ID = "4pqIwzgTlrlpRqHvWvNtVd"
+# ✅ Debugging: Zeige ALLE Secrets
+print("DEBUGGING ENVIRONMENT VARIABLES:")
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "MISSING_WEBHOOK")
+SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", "MISSING_ID")
+SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "MISSING_SECRET")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "MISSING_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "MISSING_CHAT")
 
-# ✅ Load Secrets from GitHub
-CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
-CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
-DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+print("DISCORD_WEBHOOK_URL:", DISCORD_WEBHOOK_URL)
+print("SPOTIFY_CLIENT_ID:", SPOTIFY_CLIENT_ID)
+print("SPOTIFY_CLIENT_SECRET:", SPOTIFY_CLIENT_SECRET)
+print("TELEGRAM_BOT_TOKEN:", TELEGRAM_BOT_TOKEN)
+print("TELEGRAM_CHAT_ID:", TELEGRAM_CHAT_ID)
+
+# 🔥 Sicherstellen, dass alle Secrets geladen wurden
+if "MISSING_" in DISCORD_WEBHOOK_URL:
+    raise ValueError("❌ DISCORD_WEBHOOK_URL is missing! Check your GitHub Secrets.")
+
+if "MISSING_" in TELEGRAM_BOT_TOKEN:
+    raise ValueError("❌ TELEGRAM_BOT_TOKEN is missing! Check your GitHub Secrets.")
+
+if "MISSING_" in TELEGRAM_CHAT_ID:
+    raise ValueError("❌ TELEGRAM_CHAT_ID is missing! Check your GitHub Secrets.")
+
+# ✅ Falls alles passt → Starte normalen Code
+print("✅ All environment variables loaded successfully.")
 
 # 🔥 Function: Get Spotify API Token
 def get_spotify_token():
