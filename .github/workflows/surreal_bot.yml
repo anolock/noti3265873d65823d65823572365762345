@@ -2,8 +2,8 @@ name: SurrealBot
 
 on:
   schedule:
-    - cron: "*/5 * * * *"  # Runs every 5 minutes
-  workflow_dispatch:  # Allows manual triggering
+    - cron: "*/5 * * * *"  # Läuft alle 5 Minuten
+  workflow_dispatch:  # Ermöglicht manuelles Starten
 
 jobs:
   run-bot:
@@ -21,7 +21,7 @@ jobs:
         run: pip install requests
 
       - name: Run Script
-        env:  # ✅ Load GitHub Secrets into the environment
+        env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
