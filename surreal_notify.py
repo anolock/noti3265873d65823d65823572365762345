@@ -1,27 +1,18 @@
 import requests
 import os
-import datetime
+import time
 
-# ✅ Surreal.wav’s Spotify Artist ID
+# ✅ Spotify Artist ID für Surreal.wav
 ARTIST_ID = "4pqIwzgTlrlpRqHvWvNtVd"
 
-# ✅ API Keys (Securely loaded from GitHub Secrets)
+# ✅ API Keys (aus GitHub Secrets)
 CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-# ✅ Telegram Bot API Configuration
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")  # Set in GitHub Secrets
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")  # Your Telegram channel ID
-
-# ✅ Role ID for @🔔 ⋄ Notification ⋄
-ROLE_ID = "1342206955745317005"
-
-# ✅ File to track last release and last Telegram check-in
-LAST_RELEASE_FILE = "last_release.txt"
-LAST_TELEGRAM_FILE = "last_telegram.txt"
-
-# 🔥 Function to Get a Spotify API Access Token
+# 🔥 Funktion: Spotify API Access Token abrufen
 def get_spotify_token():
     url = "https://accounts.spotify.com/api/token"
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
@@ -33,7 +24,7 @@ def get_spotify_token():
     response = requests.post(url, headers=headers, data=data)
     return response.json().get("access_token")
 
-# 🔥 Function to Check for New Releases
+# 🔥 Funktion: Checken, ob neuer Release verfügbar ist
 def check_new_release():
     token = get_spotify_token()
     url = f"https://api.spotify.com/v1/artists/{ARTIST_ID}/albums?include_groups=single,album&limit=1"
@@ -47,74 +38,58 @@ def check_new_release():
         album_name = latest_release["name"]
         release_date = latest_release["release_date"]
         spotify_url = latest_release["external_urls"]["spotify"]
-        cover_url = latest_release["images"][0]["url"]  # 🎨 Cover Art
+        cover_url = latest_release["images"][0]["url"]
 
         return album_name, release_date, spotify_url, cover_url
-
     return None, None, None, None
 
-# 🔥 Function to Send a Discord Notification
-def send_discord_notification(album_name, release_date, spotify_url, cover_url):
-    embed = {
-        "content": f"<@&{ROLE_ID}> 🚀 **Surreal.wav just dropped a new track!** 🎶",
-        "embeds": [
-            {
-                "title": album_name,
-                "description": f"📅 **Release Date:** {release_date}\n🔗 **[Listen on Spotify]({spotify_url})**",
-                "color": 16711680,  # 🔴 Red color
-                "thumbnail": {"url": cover_url}
-            }
-        ]
-    }
-    
+# 🔥 Funktion: Discord Nachricht senden (MIT EMBEDDING)
+def send_discord_notification(message, album_name=None, release_date=None, spotify_url=None, cover_url=None):
+    embed = {"content": message, "embeds": []}
+
+    if album_name:
+        embed["embeds"].append({
+            "title": album_name,
+            "description": f"📅 **Release Date:** {release_date}\n🔗 **[Listen on Spotify]({spotify_url})**",
+            "color": 16711680,
+            "thumbnail": {"url": cover_url}
+        })
+
     headers = {"Content-Type": "application/json"}
     requests.post(DISCORD_WEBHOOK_URL, json=embed, headers=headers)
 
-# 🔥 Function to Send a Telegram Notification
-def send_telegram_notification(message):
+# 🔥 Funktion: Telegram Nachricht senden (OHNE EMBEDDING)
+def send_telegram_notification(message, cover_url=None):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    data = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
-    requests.post(url, json=data)
+    data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
+    requests.post(url, data=data)
 
-# ✅ Read last release from file
-def get_last_release():
-    if os.path.exists(LAST_RELEASE_FILE):
-        with open(LAST_RELEASE_FILE, "r") as file:
-            return file.read().strip()
-    return None
+    # Falls es ein Cover-Bild gibt, separat senden
+    if cover_url:
+        url_photo = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
+        data_photo = {"chat_id": TELEGRAM_CHAT_ID, "photo": cover_url}
+        requests.post(url_photo, data=data_photo)
 
-# ✅ Save last release to file
-def save_last_release(release_name):
-    with open(LAST_RELEASE_FILE, "w") as file:
-        file.write(release_name)
+# ✅ Einmalige "Bot aktiviert"-Nachricht senden
+send_discord_notification("🚀 **SurrealBot aktiviert!** Ich überwache neue Releases. 🎶")
+send_telegram_notification("🚀 **SurrealBot aktiviert!** Ich überwache neue Releases. 🎶")
 
-# ✅ Read last Telegram check-in timestamp
-def get_last_telegram():
-    if os.path.exists(LAST_TELEGRAM_FILE):
-        with open(LAST_TELEGRAM_FILE, "r") as file:
-            return file.read().strip()
-    return None
+# ✅ Letzter Release-Name speichern
+last_release = None
 
-# ✅ Save current timestamp for Telegram check-in
-def save_last_telegram():
-    with open(LAST_TELEGRAM_FILE, "w") as file:
-        file.write(str(datetime.date.today()))
-
-# ✅ Main Execution
-if __name__ == "__main__":
+while True:
     album_name, release_date, spotify_url, cover_url = check_new_release()
-    last_release = get_last_release()
 
-    # 📢 Check for new releases
+    # ✅ Falls neuer Release → Nachricht senden
     if album_name and album_name != last_release:
-        send_discord_notification(album_name, release_date, spotify_url, cover_url)
-        send_telegram_notification(f"🚀 **New Surreal.wav Release:** [{album_name}]({spotify_url}) 🎶")
-        save_last_release(album_name)
+        # Discord Nachricht (mit Rich Embedding)
+        send_discord_notification("🔥 **Neuer Surreal.wav Release!** 🎧", album_name, release_date, spotify_url, cover_url)
 
-    # 🕒 Send daily Telegram message if 24 hours have passed
-    last_telegram = get_last_telegram()
-    today = str(datetime.date.today())
+        # Telegram Nachricht (nur Text + separates Bild)
+        telegram_msg = f"🔥 **Neuer Surreal.wav Release!** 🎧\n📅 {release_date}\n🔗 [Spotify]({spotify_url})"
+        send_telegram_notification(telegram_msg, cover_url)
 
-    if last_telegram != today:
-        send_telegram_notification("📢 Submit your demos at [Surreal.wav](https://www.surrealwavrecords.com) or via email: demos@surrealwavrecords.com")
-        save_last_telegram()
+        last_release = album_name  # Letzten Release speichern
+
+    # ⏳ Warten, bevor der nächste Check startet (5 Minuten)
+    time.sleep(300)
