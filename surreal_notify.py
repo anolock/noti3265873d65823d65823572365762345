@@ -2,40 +2,25 @@ import requests
 import os
 import time
 
-# ✅ Debugging: Zeige ALLE Secrets (außer sensible Daten) an
-print("DEBUGGING ENVIRONMENT VARIABLES:")
-print("DISCORD_WEBHOOK_URL:", os.getenv("DISCORD_WEBHOOK_URL"))
-print("SPOTIFY_CLIENT_ID:", os.getenv("SPOTIFY_CLIENT_ID"))
-print("SPOTIFY_CLIENT_SECRET:", os.getenv("SPOTIFY_CLIENT_SECRET"))
-print("TELEGRAM_BOT_TOKEN:", os.getenv("TELEGRAM_BOT_TOKEN"))
-print("TELEGRAM_CHAT_ID:", os.getenv("TELEGRAM_CHAT_ID"))
-
 # ✅ Lade die Secrets korrekt
-DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "NOT_FOUND")
-SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", "NOT_FOUND")
-SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "NOT_FOUND")
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "NOT_FOUND")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "NOT_FOUND")
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
+SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
+SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 # ✅ Debugging: Prüfe, ob Secrets geladen wurden
-print("\nAFTER LOADING SECRETS:")
-print("DISCORD_WEBHOOK_URL:", DISCORD_WEBHOOK_URL)
-print("SPOTIFY_CLIENT_ID:", SPOTIFY_CLIENT_ID)
-print("SPOTIFY_CLIENT_SECRET:", SPOTIFY_CLIENT_SECRET)
-print("TELEGRAM_BOT_TOKEN:", TELEGRAM_BOT_TOKEN)
-print("TELEGRAM_CHAT_ID:", TELEGRAM_CHAT_ID)
-
-
+if None in [DISCORD_WEBHOOK_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID]:
+    print("❌ ERROR: One or more environment variables are missing!")
+    print(f"DISCORD_WEBHOOK_URL: {DISCORD_WEBHOOK_URL}")
+    print(f"SPOTIFY_CLIENT_ID: {SPOTIFY_CLIENT_ID}")
+    print(f"SPOTIFY_CLIENT_SECRET: {SPOTIFY_CLIENT_SECRET}")
+    print(f"TELEGRAM_BOT_TOKEN: {TELEGRAM_BOT_TOKEN}")
+    print(f"TELEGRAM_CHAT_ID: {TELEGRAM_CHAT_ID}")
+    exit(1)  # 🚨 Stoppe das Skript, wenn ein Secret fehlt
 
 # ✅ Spotify Artist ID für Surreal.wav
 ARTIST_ID = "4pqIwzgTlrlpRqHvWvNtVd"
-
-# ✅ API Keys (aus GitHub Secrets)
-CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
-CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
-DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 # 🔥 Funktion: Spotify API Access Token abrufen
 def get_spotify_token():
@@ -43,8 +28,8 @@ def get_spotify_token():
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     data = {
         "grant_type": "client_credentials",
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET
+        "client_id": SPOTIFY_CLIENT_ID,
+        "client_secret": SPOTIFY_CLIENT_SECRET
     }
     response = requests.post(url, headers=headers, data=data)
     return response.json().get("access_token")
@@ -64,8 +49,8 @@ def check_new_release():
         release_date = latest_release["release_date"]
         spotify_url = latest_release["external_urls"]["spotify"]
         cover_url = latest_release["images"][0]["url"]
-
         return album_name, release_date, spotify_url, cover_url
+
     return None, None, None, None
 
 # 🔥 Funktion: Discord Nachricht senden (MIT EMBEDDING)
@@ -81,23 +66,39 @@ def send_discord_notification(message, album_name=None, release_date=None, spoti
         })
 
     headers = {"Content-Type": "application/json"}
-    requests.post(DISCORD_WEBHOOK_URL, json=embed, headers=headers)
+    response = requests.post(DISCORD_WEBHOOK_URL, json=embed, headers=headers)
+    
+    if response.status_code == 204:
+        print("✅ Discord message sent successfully.")
+    else:
+        print(f"❌ Discord error: {response.text}")
 
 # 🔥 Funktion: Telegram Nachricht senden (OHNE EMBEDDING)
 def send_telegram_notification(message, cover_url=None):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
-    requests.post(url, data=data)
+    response = requests.post(url, data=data)
+
+    if response.status_code == 200:
+        print("✅ Telegram text message sent successfully.")
+    else:
+        print(f"❌ Telegram text error: {response.text}")
 
     # Falls es ein Cover-Bild gibt, separat senden
     if cover_url:
         url_photo = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
         data_photo = {"chat_id": TELEGRAM_CHAT_ID, "photo": cover_url}
-        requests.post(url_photo, data=data_photo)
+        response_photo = requests.post(url_photo, data=data_photo)
+
+        if response_photo.status_code == 200:
+            print("✅ Telegram image sent successfully.")
+        else:
+            print(f"❌ Telegram image error: {response_photo.text}")
 
 # ✅ Einmalige "Bot aktiviert"-Nachricht senden
-send_discord_notification("🚀 **SurrealBot aktiviert!** Ich überwache neue Releases. 🎶")
-send_telegram_notification("🚀 **SurrealBot aktiviert!** Ich überwache neue Releases. 🎶")
+print("🚀 Sending startup message...")
+send_discord_notification("🚀 **SurrealBot is now active!** I'm monitoring new releases. 🎶")
+send_telegram_notification("🚀 **SurrealBot is now active!** I'm monitoring new releases. 🎶")
 
 # ✅ Letzter Release-Name speichern
 last_release = None
@@ -107,14 +108,19 @@ while True:
 
     # ✅ Falls neuer Release → Nachricht senden
     if album_name and album_name != last_release:
+        print(f"🔥 New release detected: {album_name} ({release_date})")
+
         # Discord Nachricht (mit Rich Embedding)
-        send_discord_notification("🔥 **Neuer Surreal.wav Release!** 🎧", album_name, release_date, spotify_url, cover_url)
+        send_discord_notification("🔥 **New Surreal.wav Release!** 🎧", album_name, release_date, spotify_url, cover_url)
 
         # Telegram Nachricht (nur Text + separates Bild)
-        telegram_msg = f"🔥 **Neuer Surreal.wav Release!** 🎧\n📅 {release_date}\n🔗 [Spotify]({spotify_url})"
+        telegram_msg = f"🔥 **New Surreal.wav Release!** 🎧\n📅 {release_date}\n🔗 [Spotify]({spotify_url})"
         send_telegram_notification(telegram_msg, cover_url)
 
         last_release = album_name  # Letzten Release speichern
+    else:
+        print("🔍 No new release found.")
 
     # ⏳ Warten, bevor der nächste Check startet (5 Minuten)
+    print("⏳ Sleeping for 5 minutes...")
     time.sleep(300)
