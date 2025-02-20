@@ -22,5 +22,5 @@ jobs:
 
       - name: Run Script
         run: |
-          cd ${{ github.workspace }}
+          cd ${{ github.workspace }}  # ✅ Ensures the script runs in the correct directory
           python surreal_notify.py
