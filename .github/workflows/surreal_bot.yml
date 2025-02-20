@@ -20,6 +20,7 @@ jobs:
       - name: Install Dependencies
         run: pip install requests
 
-      - name: Run Script
-        run: python ./surreal_notify.py
+- name: Run Script
+  run: python surreal_notify.py
+
 
