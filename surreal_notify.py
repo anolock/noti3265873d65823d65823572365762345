@@ -11,6 +11,8 @@ SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "MISSING_SECRET")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "MISSING_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "MISSING_CHAT")
 
+DISCORD_ROLE_ID = "1342206955745317005"  # Deine Discord-Rollen-ID für Notifications
+
 # 🔥 Make sure all secrets are present
 if "MISSING" in [DISCORD_WEBHOOK_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID]:
     raise ValueError("❌ ERROR: One or more GitHub Secrets are missing! Check your repository settings.")
@@ -53,50 +55,65 @@ def check_new_release():
         return album_name, release_date, spotify_url, cover_url
     return None, None, None, None
 
-# 🔥 Function: Send Discord Notification
-def send_discord_notification(title, description, spotify_url=None, cover_url=None):
+# 🔥 Function: Send Discord Notification (with Role Tag)
+def send_discord_notification(album_name, release_date, spotify_url, cover_url, is_startup=False):
     print("📢 Sending Discord notification...")
+    
+    if is_startup:
+        message = "🚀 **SurrealBot is now active!** I'm monitoring new releases."
+    else:
+        message = f"<@&{DISCORD_ROLE_ID}> 🔥 **New Surreal.wav Release!** 🎧"
+
     embed = {
-        "content": title,
+        "content": message,
         "embeds": [
             {
-                "title": description,
-                "description": f"📅 **Release Date:** {release_date}\n🔗 **[Listen on Spotify]({spotify_url})**",
+                "title": album_name if not is_startup else "SurrealBot Activated",
+                "description": f"📅 **Release Date:** {release_date}\n🔗 **[Listen on Spotify]({spotify_url})**" if not is_startup else "I'm watching for new releases now.",
                 "color": 16711680,  # Red
-                "thumbnail": {"url": cover_url}
+                "thumbnail": {"url": cover_url} if not is_startup else {},
             }
         ]
     }
     
     headers = {"Content-Type": "application/json"}
     response = requests.post(DISCORD_WEBHOOK_URL, json=embed, headers=headers)
-    if response.status_code == 204:
+    if response.status_code in [200, 204]:
         print("✅ Discord notification sent successfully!")
     else:
         print(f"⚠️ Discord notification failed: {response.text}")
 
-# 🔥 Function: Send Telegram Notification
-def send_telegram_notification(album_name, cover_url, release_date, spotify_url):
+# 🔥 Function: Send Telegram Notification (Better Formatting)
+def send_telegram_notification(album_name, release_date, spotify_url, cover_url, is_startup=False):
     print("📢 Sending Telegram notification...")
     base_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
-    # 🔹 Step 1: Send album title
-    message_text = f"🔥 **New Surreal.wav Release!** 🎧\n{album_name}"
-    requests.post(f"{base_url}/sendMessage", data={"chat_id": TELEGRAM_CHAT_ID, "text": message_text})
+    if is_startup:
+        message_text = "🚀 **SurrealBot is now active!** I'm monitoring new releases. 🎶"
+    else:
+        message_text = (
+            f"🔥 **New Surreal.wav Release!** 🎧\n\n"
+            f"🎵 *{album_name}*\n"
+            f"📅 **Release Date:** {release_date}\n"
+            f"🔗 [Listen on Spotify]({spotify_url})"
+        )
 
-    # 🔹 Step 2: Send album cover image
-    requests.post(f"{base_url}/sendPhoto", data={"chat_id": TELEGRAM_CHAT_ID, "photo": cover_url})
-
-    # 🔹 Step 3: Send release details
-    details_text = f"📅 **Release Date:** {release_date}\n🔗 **[Listen on Spotify]({spotify_url})**"
-    requests.post(f"{base_url}/sendMessage", data={"chat_id": TELEGRAM_CHAT_ID, "text": details_text})
-
-    print("✅ Telegram notifications sent successfully!")
+    response = requests.post(f"{base_url}/sendPhoto", data={"chat_id": TELEGRAM_CHAT_ID, "caption": message_text, "photo": cover_url})
+    
+    if response.status_code == 200:
+        print("✅ Telegram notification sent successfully!")
+    else:
+        print(f"⚠️ Telegram notification failed: {response.text}")
 
 # ✅ Send a one-time "Bot is active" message
-print("🚀 Bot is now active! Sending initial notification...")
-send_discord_notification("SurrealBot is now active!", "I'm monitoring new releases.")
-send_telegram_notification("SurrealBot is now active!", "", "", "")
+if not os.path.exists("bot_active.flag"):
+    print("🚀 Bot is now active! Sending initial notification...")
+    send_discord_notification("SurrealBot is now active!", "", "", "", is_startup=True)
+    send_telegram_notification("SurrealBot is now active!", "", "", "", is_startup=True)
+    
+    # Erstellt eine Datei als "Flag", damit diese Nachricht nur EINMAL kommt
+    with open("bot_active.flag", "w") as f:
+        f.write("Bot was started")
 
 # ✅ Store last release name
 last_release = None
@@ -110,10 +127,10 @@ while True:
         print(f"🎉 New release found: {album_name}")
 
         # ✅ Send to Discord
-        send_discord_notification("🔥 New Surreal.wav Release! 🎧", album_name, spotify_url, cover_url)
+        send_discord_notification(album_name, release_date, spotify_url, cover_url)
 
         # ✅ Send to Telegram
-        send_telegram_notification(album_name, cover_url, release_date, spotify_url)
+        send_telegram_notification(album_name, release_date, spotify_url, cover_url)
 
         last_release = album_name  # Save last release
 
