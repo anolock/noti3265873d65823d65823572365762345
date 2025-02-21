@@ -3,12 +3,27 @@ import os
 import json
 import time
 
-# ✅ Load secrets from GitHub Actions
-DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "").strip() or None
-SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", "").strip() or None
-SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "").strip() or None
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip() or None
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip() or None
+# ✅ Debugging: Print loaded secrets
+print("🚀 DEBUG: Checking environment variables...")
+
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
+SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", "").strip()
+SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "").strip()
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+
+# 🔥 Debugging Output (DO NOT LOG SENSITIVE INFO LIKE TOKENS)
+print(f"🔍 DISCORD_WEBHOOK_URL Loaded: {'✅' if DISCORD_WEBHOOK_URL else '❌ MISSING'}")
+print(f"🔍 SPOTIFY_CLIENT_ID Loaded: {'✅' if SPOTIFY_CLIENT_ID else '❌ MISSING'}")
+print(f"🔍 SPOTIFY_CLIENT_SECRET Loaded: {'✅' if SPOTIFY_CLIENT_SECRET else '❌ MISSING'}")
+print(f"🔍 TELEGRAM_BOT_TOKEN Loaded: {'✅' if TELEGRAM_BOT_TOKEN else '❌ MISSING'}")
+print(f"🔍 TELEGRAM_CHAT_ID Loaded: {'✅' if TELEGRAM_CHAT_ID else '❌ MISSING'}")
+
+# ✅ Ensure at least one service is available
+if not DISCORD_WEBHOOK_URL and not TELEGRAM_BOT_TOKEN:
+    print("❌ ERROR: No valid notification methods available (Discord or Telegram required). Exiting.")
+    exit(1)
+
 
 DISCORD_ROLE_ID = "1342206955745317005"  # Discord role for notifications
 LAST_RELEASE_FILE = "last_release.json"  # JSON file to track releases
