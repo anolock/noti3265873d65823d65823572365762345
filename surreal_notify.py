@@ -69,13 +69,21 @@ def send_alert(release):
     )
 
     # Telegram
+    keyboard = {
+        "inline_keyboard": [[{
+            "text": "🎵 Listen Now", 
+            "url": release["url"]
+        }]]
+    }
+    
     requests.post(
         f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto",
         data={
             "chat_id": TELEGRAM_CHAT_ID,
             "photo": release["cover"],
-            "caption": f"🔥 *New Release!* 🎧\n\n**{release['name']}**\n🎤 {release['artist']}",
-            "parse_mode": "Markdown"
+            "caption": f"🔥 *{release['name']}*\n🎤 {release['artist']}",
+            "parse_mode": "Markdown",
+            "reply_markup": json.dumps(keyboard)
         }
     )
 
