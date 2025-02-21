@@ -1,33 +1,19 @@
 import requests
 import os
 import json
+import re
 
-# ✅ Load Secrets from GitHub Actions
+# ✅ Load Secrets
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", "").strip()
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "").strip()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 
-DISCORD_ROLE_ID = "1342206955745317005"  # Notification Role for Discord
+DISCORD_ROLE_ID = "1342206955745317005"  # ✅ Discord role for tagging
+AUTHORIZED_CODE = "4852"  # ✅ Change this to your security code
 
-# ✅ Error Handling for Missing Secrets
-missing_secrets = [key for key, value in {
-    "DISCORD_WEBHOOK_URL": DISCORD_WEBHOOK_URL,
-    "SPOTIFY_CLIENT_ID": SPOTIFY_CLIENT_ID,
-    "SPOTIFY_CLIENT_SECRET": SPOTIFY_CLIENT_SECRET,
-    "TELEGRAM_BOT_TOKEN": TELEGRAM_BOT_TOKEN,
-    "TELEGRAM_CHAT_ID": TELEGRAM_CHAT_ID
-}.items() if not value]
-
-if missing_secrets:
-    print(f"❌ ERROR: Missing secrets: {', '.join(missing_secrets)}")
-    exit(1)
-
-# ✅ Surreal.wav Spotify Artist ID
-ARTIST_ID = "4pqIwzgTlrlpRqHvWvNtVd"
-
-# 🔥 Function: Get Spotify API Token
+# ✅ Get Spotify API Access Token
 def get_spotify_token():
     url = "https://accounts.spotify.com/api/token"
     response = requests.post(url, data={
@@ -37,21 +23,26 @@ def get_spotify_token():
     }, headers={"Content-Type": "application/x-www-form-urlencoded"})
     return response.json().get("access_token")
 
-# 🔥 Function: Check for New Releases
-def check_new_release():
+# ✅ Fetch Release Details from Spotify
+def get_release_details(spotify_url):
+    match = re.search(r"album/([a-zA-Z0-9]+)", spotify_url)
+    if not match:
+        return None, None, None, None
+
+    album_id = match.group(1)
     token = get_spotify_token()
-    url = f"https://api.spotify.com/v1/artists/{ARTIST_ID}/albums?include_groups=single,album&limit=1"
+    url = f"https://api.spotify.com/v1/albums/{album_id}"
     headers = {"Authorization": f"Bearer {token}"}
     
     response = requests.get(url, headers=headers)
     data = response.json()
 
-    if "items" in data and data["items"]:
-        latest = data["items"][0]
-        return latest["name"], latest["release_date"], latest["external_urls"]["spotify"], latest["images"][0]["url"]
+    if "name" in data:
+        return data["name"], data["release_date"], data["external_urls"]["spotify"], data["images"][0]["url"]
+    
     return None, None, None, None
 
-# 🔥 Function: Send Discord Notification
+# ✅ Send Discord Notification
 def send_discord_notification(album_name, release_date, spotify_url, cover_url):
     message = f"<@&{DISCORD_ROLE_ID}> 🔥 **New Surreal.wav Release!** 🎧"
     embed = {
@@ -66,19 +57,12 @@ def send_discord_notification(album_name, release_date, spotify_url, cover_url):
     
     requests.post(DISCORD_WEBHOOK_URL, json=embed, headers={"Content-Type": "application/json"})
 
-# 🔥 Function: Send Telegram Notification with Inline Button
+# ✅ Send Telegram Notification with Spotify Button
 def send_telegram_notification(album_name, release_date, spotify_url, cover_url):
-    print("📢 Sending Telegram notification...")
-
     base_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
-    
-    # 📸 Send image with caption (title & release date in one message)
-    message_text = (
-        f"🔥 **New Surreal.wav Release!** 🎧\n\n"
-        f"🎵 *{album_name}*\n"
-        f"📅 **Release Date:** {release_date}"
-    )
 
+    # 📸 Send image with caption
+    message_text = f"🔥 **New Surreal.wav Release!** 🎧\n🎵 *{album_name}*\n📅 **Release Date:** {release_date}"
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
         "photo": cover_url,
@@ -89,11 +73,11 @@ def send_telegram_notification(album_name, release_date, spotify_url, cover_url)
     response = requests.post(f"{base_url}/sendPhoto", data=payload)
     
     if response.status_code == 200:
-        print("✅ Telegram image + caption sent successfully!")
+        print("✅ Telegram image sent successfully!")
     else:
-        print(f"⚠️ Telegram image upload failed: {response.text}")
+        print(f"⚠️ Telegram image failed: {response.text}")
 
-    # 🔘 Add an inline button to Spotify
+    # 🔘 Add Spotify Button
     keyboard = {
         "inline_keyboard": [[{"text": "🎶 Listen on Spotify", "url": spotify_url}]]
     }
@@ -112,50 +96,41 @@ def send_telegram_notification(album_name, release_date, spotify_url, cover_url)
     else:
         print(f"⚠️ Telegram button failed: {response.text}")
 
-# ✅ Store Last Release & Prevent Reposting
-album_name, release_date, spotify_url, cover_url = check_new_release()
+# ✅ Process Incoming Telegram Messages
+def process_telegram_messages():
+    base_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+    last_update_id = None
 
-if album_name:
-    last_release_file = "last_release.txt"
+    while True:
+        response = requests.get(f"{base_url}/getUpdates?offset={last_update_id+1 if last_update_id else ''}")
+        data = response.json()
 
-    if os.path.exists(last_release_file):
-        with open(last_release_file, "r") as f:
-            last_release = f.read().strip()
-    else:
-        last_release = None
+        if "result" in data and data["result"]:
+            for update in data["result"]:
+                last_update_id = update["update_id"]
+                
+                if "message" in update and "text" in update["message"]:
+                    chat_id = update["message"]["chat"]["id"]
+                    text = update["message"]["text"].strip()
 
-    if album_name != last_release:
-        print(f"🎉 New release found: {album_name}")
+                    if text.startswith("/release"):
+                        parts = text.split(" ")
+                        if len(parts) == 3 and parts[1] == AUTHORIZED_CODE:
+                            spotify_url = parts[2]
+                            album_name, release_date, spotify_url, cover_url = get_release_details(spotify_url)
 
-        send_discord_notification(album_name, release_date, spotify_url, cover_url)
-        send_telegram_notification(album_name, release_date, spotify_url, cover_url)
+                            if album_name:
+                                send_discord_notification(album_name, release_date, spotify_url, cover_url)
+                                send_telegram_notification(album_name, release_date, spotify_url, cover_url)
+                                response_text = f"✅ Release **{album_name}** added successfully!"
+                            else:
+                                response_text = "⚠️ Invalid Spotify URL or album not found."
+                        else:
+                            response_text = "❌ Incorrect format. Use: `/release 4852 [Spotify-Link]`"
 
-        with open(last_release_file, "w") as f:
-            f.write(album_name)
-    else:
-        print("😴 No new releases found.")
+                        # Send response message
+                        requests.post(f"{base_url}/sendMessage", data={"chat_id": chat_id, "text": response_text})
 
-# ✅ Manual Release Trigger via Telegram
-def handle_telegram_commands():
-    base_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
-    response = requests.get(base_url)
-    
-    if response.status_code == 200:
-        updates = response.json().get("result", [])
-        for update in updates:
-            message = update.get("message", {})
-            text = message.get("text", "").strip()
-            
-            if text.startswith("/release"):
-                parts = text.split()
-                if len(parts) == 3 and parts[1] == "4852":
-                    manual_url = parts[2]
-                    print(f"📢 Manually added release: {manual_url}")
-
-                    send_discord_notification("Manual Release", "Added manually via Telegram", manual_url, "")
-                    send_telegram_notification("Manual Release", "Added manually via Telegram", manual_url, "")
-                    return "✅ Manual release added successfully!"
-                else:
-                    return "❌ Invalid command. Use `/release 4852 [Spotify-Link]`"
-
-handle_telegram_commands()
+# ✅ Run Telegram Message Processing
+if __name__ == "__main__":
+    process_telegram_messages()
