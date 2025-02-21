@@ -11,57 +11,26 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 PROMOTION_CODE = os.getenv("PROMOTION_CODE")
 DISCORD_ROLE_ID = "1342206955745317005"
-DATABASE_FILE = "processed_releases.json"
+DATABASE_FILE = "surreal_db.json"
 
-# ---------- Datenbank (Workflow-sicher) ----------
+# ---------- Atomic Database ----------
 def load_database():
     try:
         with open(DATABASE_FILE, "r") as f:
-            return json.load(f).get("releases", [])
+            return json.load(f).get("processed", [])
     except (FileNotFoundError, json.JSONDecodeError):
         return []
 
-def save_to_database(release_id):
-    releases = load_database()
-    if release_id not in releases:
-        releases.append(release_id)
+def update_database(release_id):
+    db = {"processed": load_database()}
+    if release_id not in db["processed"]:
+        db["processed"].append(release_id)
         with open(DATABASE_FILE, "w") as f:
-            json.dump({"releases": releases}, f, indent=2)
+            json.dump(db, f, indent=2, ensure_ascii=False)
 
-# ---------- Spotify Check (Einmal pro Run) ----------
-def get_spotify_token():
-    response = requests.post(
-        "https://accounts.spotify.com/api/token",
-        data={"grant_type": "client_credentials"},
-        auth=(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET)
-    )
-    return response.json().get("access_token")
-
-def fetch_latest_release():
-    token = get_spotify_token()
-    if not token:
-        return None
-    
-    response = requests.get(
-        "https://api.spotify.com/v1/artists/4pqIwzgTlrlpRqHvWvNtVd/albums?include_groups=single,album&limit=1",
-        headers={"Authorization": f"Bearer {token}"}
-    )
-    
-    data = response.json()
-    if data.get("items"):
-        album = data["items"][0]
-        return {
-            "id": album["id"],
-            "name": album["name"],
-            "date": album["release_date"],
-            "url": album["external_urls"]["spotify"],
-            "cover": album["images"][0]["url"] if album["images"] else ""
-        }
-    return None
-
-# ---------- Notifications (Formatiert) ----------
-def send_discord(release):
-    embed = {
+# ---------- Notification Templates ----------
+def send_discord_alert(release):
+    payload = {
         "content": f"<@&{DISCORD_ROLE_ID}> 🔔・Notification・🔥 New Surreal.wav Release! 🎧",
         "embeds": [{
             "title": release["name"],
@@ -70,51 +39,73 @@ def send_discord(release):
             "thumbnail": {"url": release["cover"]}
         }]
     }
-    requests.post(DISCORD_WEBHOOK_URL, json=embed)
+    requests.post(DISCORD_WEBHOOK_URL, json=payload)
 
-def send_telegram(release):
-    message = (
-        "🔥 *New Surreal.wav Release!* 🎧\n\n"
-        f"🎵 *{release['name']}*\n"
-        f"📅 *Release Date*: {release['date']}\n"
-        f"🔗 [Listen on Spotify]({release['url']})"
-    )
+def send_telegram_alert(release):
     requests.post(
         f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto",
         data={
             "chat_id": TELEGRAM_CHAT_ID,
             "photo": release["cover"],
-            "caption": message,
+            "caption": (
+                f"🔥 *New Surreal.wav Release!* 🎧\n\n"
+                f"🎵 **{release['name']}**\n"
+                f"📅 {release['date']}\n"
+                f"[SPOTIFY]({release['url']})"
+            ),
             "parse_mode": "Markdown"
         }
     )
 
-# ---------- Manuelle Promotion (Code-geschützt) ----------
+# ---------- Core Logic ----------
+def spotify_check():
+    token = requests.post(
+        "https://accounts.spotify.com/api/token",
+        auth=(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET),
+        data={"grant_type": "client_credentials"}
+    ).json().get("access_token")
+
+    if token:
+        response = requests.get(
+            "https://api.spotify.com/v1/artists/4pqIwzgTlrlpRqHvWvNtVd/albums?include_groups=single,album&limit=1",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        album = response.json().get("items", [{}])[0]
+        return {
+            "id": album.get("id"),
+            "name": album.get("name"),
+            "date": album.get("release_date"),
+            "url": album.get("external_urls", {}).get("spotify"),
+            "cover": album.get("images", [{}])[0].get("url")
+        } if album.get("id") else None
+
 def process_commands():
-    response = requests.get(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates").json()
-    for update in response.get("result", []):
-        if "message" in update and update["message"].get("text", "").startswith("/promote"):
+    updates = requests.get(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates").json()
+    for update in updates.get("result", []):
+        if "/promote" in update.get("message", {}).get("text", ""):
             parts = update["message"]["text"].split()
             if len(parts) == 3 and parts[1] == PROMOTION_CODE:
                 url = parts[2]
                 release_id = urlparse(url).path.split("/")[-1]
                 if release_id not in load_database():
-                    release_data = {
-                        "id": release_id,
+                    update_database(release_id)
+                    send_discord_alert({
                         "name": "MANUAL RELEASE",
                         "date": "2025-02-20",
                         "url": url,
-                        "cover": "https://example.com/cover.jpg"  # Manuell anpassen
-                    }
-                    send_discord(release_data)
-                    send_telegram(release_data)
-                    save_to_database(release_id)
+                        "cover": "https://i.scdn.co/image/ab67616d0000b273..."
+                    })
+                    send_telegram_alert({
+                        "name": "MANUAL RELEASE",
+                        "date": "2025-02-20",
+                        "url": url,
+                        "cover": "https://i.scdn.co/image/ab67616d0000b273..."
+                    })
 
-# ---------- Hauptlogik (Kein Loop!) ----------
 if __name__ == "__main__":
-    process_commands()  # Verarbeite manuelle Befehle
-    latest_release = fetch_latest_release()  # Einmaliger Check
-    if latest_release and latest_release["id"] not in load_database():
-        send_discord(latest_release)
-        send_telegram(latest_release)
-        save_to_database(latest_release["id"])
+    process_commands()
+    latest = spotify_check()
+    if latest and latest["id"] not in load_database():
+        send_discord_alert(latest)
+        send_telegram_alert(latest)
+        update_database(latest["id"])
