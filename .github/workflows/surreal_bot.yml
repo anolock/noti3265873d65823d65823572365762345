@@ -1,6 +1,8 @@
 name: SurrealBot
 on:
-  workflow_dispatch:  # Nur manueller Trigger
+  schedule:
+    - cron: "*/5 * * * *"  # Läuft alle 5 Minuten neu
+  workflow_dispatch:
 
 jobs:
   run:
@@ -9,17 +11,26 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Cache Database
+        uses: actions/cache@v3
+        with:
+          path: processed_releases.json
+          key: db-${{ hashFiles('processed_releases.json') }}
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: pip install requests python-dotenv
 
-      - name: Run Bot
+      - name: Run Script
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PROMOTION_CODE: ${{ secrets.PROMOTION_CODE }}
         run: python surreal_notify.py
