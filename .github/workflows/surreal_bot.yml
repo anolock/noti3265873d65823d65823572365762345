@@ -1,7 +1,7 @@
 name: SurrealBot
 on:
   schedule:
-    - cron: "*/5 * * * *"  # Garantiert alle 5 Minuten
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -10,12 +10,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Cache Database
-        uses: actions/cache@v3
         with:
-          path: surreal_db.json
-          key: db-${{ hashFiles('surreal_db.json') }}
+          persist-credentials: false
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -28,9 +24,14 @@ jobs:
       - name: Run Bot
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
-          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          PROMOTION_CODE: ${{ secrets.PROMOTION_CODE }}
         run: python surreal_notify.py
+
+      - name: Commit Changes
+        run: |
+          git config --global user.name "GitHub Bot"
+          git config --global user.email "actions@github.com"
+          git add processed_releases.json
+          git commit -m "Update release database" || exit 0
+          git push
