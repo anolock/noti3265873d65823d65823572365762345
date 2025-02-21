@@ -1,6 +1,7 @@
 import requests
 import os
 import json
+import time
 
 # ✅ Load secrets from GitHub Actions
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
@@ -28,20 +29,23 @@ if missing_secrets:
 # ✅ Surreal.wav’s Spotify Artist ID
 ARTIST_ID = "4pqIwzgTlrlpRqHvWvNtVd"
 
-# ✅ Load last saved release
-def load_last_release():
+# ✅ Load last saved releases from JSON
+def load_last_releases():
     if os.path.exists(LAST_RELEASE_FILE):
         with open(LAST_RELEASE_FILE, "r") as f:
             try:
-                return json.load(f).get("last_release", None)
+                return json.load(f).get("releases", [])
             except json.JSONDecodeError:
-                return None
-    return None
+                return []
+    return []
 
-# ✅ Save last release
+# ✅ Save new release to JSON
 def save_last_release(release_id):
-    with open(LAST_RELEASE_FILE, "w") as f:
-        json.dump({"last_release": release_id}, f)
+    releases = load_last_releases()
+    if release_id not in releases:
+        releases.append(release_id)
+        with open(LAST_RELEASE_FILE, "w") as f:
+            json.dump({"releases": releases}, f)
 
 # 🔥 Function: Get Spotify API Token
 def get_spotify_token():
@@ -136,23 +140,28 @@ def process_telegram_commands():
                         # Extract the Spotify album ID
                         album_id = spotify_url.split("/")[-1].split("?")[0]
 
-                        # Manually save this as the last release (without triggering a notification)
-                        save_last_release(album_id)
+                        # Check if already added
+                        if album_id in load_last_releases():
+                            confirmation_text = f"⚠️ Release already exists: {spotify_url}"
+                        else:
+                            # Save the release
+                            save_last_release(album_id)
+                            confirmation_text = f"✅ Release manually added: {spotify_url}"
 
                         # Confirm to user
                         requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", data={
                             "chat_id": chat_id,
-                            "text": f"✅ Release manually added: {spotify_url}"
+                            "text": confirmation_text
                         })
 
 # ✅ Process Telegram commands before checking for releases
 process_telegram_commands()
 
 # ✅ Check for new releases
-last_release = load_last_release()
+last_releases = load_last_releases()
 release_id, album_name, release_date, spotify_url, cover_url = check_new_release()
 
-if release_id and release_id != last_release:
+if release_id and release_id not in last_releases:
     print(f"🎉 New release found: {album_name}")
 
     send_discord_notification(album_name, release_date, spotify_url, cover_url)
