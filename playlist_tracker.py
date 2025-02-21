@@ -42,17 +42,17 @@ def get_playlist_details(playlist_id, token):
     return response.json() if response.status_code == 200 else None
 
 # Discord-Benachrichtigung beim Hinzufügen
-def send_discord_add_notification(playlist_id, name, followers):
+def send_discord_add_notification(playlist_id, name, followers, cover_url):
     requests.post(
         DISCORD_PLAYLIST_WEBHOOK2,
         json={
             "content": "🎵 **Playlist added**",
             "embeds": [{
                 "title": name,
-                "description": f"🔗 [Playlist öffnen](https://open.spotify.com/playlist/{playlist_id})\n"
+                "description": f"🔗 [Open Playlist](https://open.spotify.com/playlist/{playlist_id})\n"
                              f"👥 **Follower:** {followers}",
                 "color": 5763719,  # Grüne Farbe
-                "thumbnail": {"url": "https://i.scdn.co/image/ab67616d00001e02ff9ca10b55ce82ae553c8228"}
+                "thumbnail": {"url": cover_url}
             }]
         }
     )
@@ -63,6 +63,19 @@ def send_telegram_message(chat_id, text):
         f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
         json={"chat_id": chat_id, "text": text}
     )
+
+# Playlist-Info anzeigen
+def show_playlist_info(chat_id):
+    data = load_playlists()
+    if not data["playlists"]:
+        send_telegram_message(chat_id, "❌ Keine Playlists getrackt!")
+        return
+    
+    message = "🎵 **Getrackte Playlists:**\n"
+    for playlist_id, playlist in data["playlists"].items():
+        message += f"- [{playlist['name']}](https://open.spotify.com/playlist/{playlist_id}) ({playlist['current_followers']} Follower)\n"
+    
+    send_telegram_message(chat_id, message)
 
 # Playlist hinzufügen
 def handle_playlist_command(url, chat_id):
@@ -85,13 +98,19 @@ def handle_playlist_command(url, chat_id):
             "name": playlist["name"],
             "current_followers": playlist["followers"]["total"],
             "reached_milestones": [],
-            "added_notification_sent": False  # Flag für die erste Benachrichtigung
+            "added_notification_sent": False,  # Flag für die erste Benachrichtigung
+            "cover_url": playlist["images"][0]["url"]  # Playlist-Cover speichern
         }
         save_playlists(data)
 
         # Discord-Benachrichtigung senden
         if not data["playlists"][playlist_id]["added_notification_sent"]:
-            send_discord_add_notification(playlist_id, playlist["name"], playlist["followers"]["total"])
+            send_discord_add_notification(
+                playlist_id,
+                playlist["name"],
+                playlist["followers"]["total"],
+                playlist["images"][0]["url"]  # Playlist-Cover
+            )
             data["playlists"][playlist_id]["added_notification_sent"] = True
             save_playlists(data)
 
@@ -106,12 +125,18 @@ def handle_playlist_command(url, chat_id):
 def process_playlist_commands():
     response = requests.get(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates")
     for update in response.json().get("result", []):
-        if "message" in update and update["message"].get("text", "").startswith("/p "):
-            parts = update["message"]["text"].split()
-            if len(parts) == 3 and parts[1] == PROMO_CODE:
-                handle_playlist_command(parts[2], update["message"]["chat"]["id"])
+        if "message" in update:
+            text = update["message"].get("text", "")
+            chat_id = update["message"]["chat"]["id"]
+            
+            if text.startswith("/p "):
+                parts = text.split()
+                if len(parts) == 3 and parts[1] == PROMO_CODE:
+                    handle_playlist_command(parts[2], chat_id)
+            elif text == "/p info":
+                show_playlist_info(chat_id)
 
-# Meilenstein-Checker (unverändert)
+# Meilenstein-Checker
 def check_milestones():
     token = get_spotify_token()
     data = load_playlists()
@@ -122,12 +147,28 @@ def check_milestones():
         
         for milestone in MILESTONES:
             if current >= milestone and milestone not in playlist["reached_milestones"]:
-                send_discord_alert(playlist_id, playlist["name"], milestone)
+                send_discord_milestone_alert(playlist_id, playlist["name"], milestone, playlist["cover_url"])
                 playlist["reached_milestones"].append(milestone)
         
         playlist["current_followers"] = current
     
     save_playlists(data)
+
+def send_discord_milestone_alert(playlist_id, name, milestone, cover_url):
+    mention = "<@&1342206955745317005>" if milestone >= 10000 else "@here" if milestone >= 5000 else ""
+    
+    requests.post(
+        DISCORD_PLAYLIST_WEBHOOK2,
+        json={
+            "content": f"{mention} 🚀 **Playlist Milestone: {milestone} Follower!**",
+            "embeds": [{
+                "title": name,
+                "description": f"🔗 [Open Playlist](https://open.spotify.com/playlist/{playlist_id})",
+                "color": 16711680,  # Rote Farbe
+                "thumbnail": {"url": cover_url}
+            }]
+        }
+    )
 
 if __name__ == "__main__":
     process_playlist_commands()
