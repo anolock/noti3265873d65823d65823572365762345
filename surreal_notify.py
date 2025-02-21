@@ -105,35 +105,27 @@ def send_telegram_notification(album_name, release_date, spotify_url, cover_url)
 
     base_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
     
-    # Send image with caption
+    # Send image with caption and inline keyboard
     message_text = (
         f"🔥 **New Surreal.wav Release!** 🎧\n\n"
         f"🎵 *{album_name}*\n"
-        f"📅 **Release Date:** {release_date}"
+        f"📅 **Release Date:** {release_date}\n"
+        f"🔗 [Listen on Spotify]({spotify_url})"
     )
+
+    keyboard = {
+        "inline_keyboard": [[{"text": "🎶 Listen on Spotify", "url": spotify_url}]]
+    }
 
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
         "photo": cover_url,
         "caption": message_text,
-        "parse_mode": "Markdown"
+        "parse_mode": "Markdown",
+        "reply_markup": json.dumps(keyboard)
     }
     
     requests.post(f"{base_url}/sendPhoto", data=payload)
-
-    # Add Spotify button
-    keyboard = {
-        "inline_keyboard": [[{"text": "🎶 Listen on Spotify", "url": spotify_url}]]
-    }
-
-    button_payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": "🎧 **Stream on Spotify**",
-        "reply_markup": json.dumps(keyboard),
-        "parse_mode": "Markdown"
-    }
-    
-    requests.post(f"{base_url}/sendMessage", data=button_payload)
 
 # Function: Process Telegram Commands
 def process_telegram_commands():
