@@ -11,6 +11,7 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 DISCORD_ROLE_ID = "1342206955745317005"
 DB_FILE = "processed_releases.json"
+LAST_UPDATE_FILE = "last_telegram_update.txt"
 PROMO_CODE = "4852"
 
 # Datenbank
@@ -27,6 +28,18 @@ def save_to_db(release_id):
         current.append(release_id)
         with open(DB_FILE, "w") as f:
             json.dump({"processed": current}, f, indent=2)
+
+# Telegram Update-Tracking
+def get_last_update_id():
+    try:
+        with open(LAST_UPDATE_FILE, "r") as f:
+            return int(f.read().strip())
+    except:
+        return 0
+
+def save_last_update_id(update_id):
+    with open(LAST_UPDATE_FILE, "w") as f:
+        f.write(str(update_id))
 
 # Spotify API
 def get_track_details(track_id):
@@ -58,10 +71,10 @@ def send_alert(release):
     requests.post(
         DISCORD_WEBHOOK_URL,
         json={
-            "content": f"<@&{DISCORD_ROLE_ID}> 🔥 New Surreal.wav Release! 🎧",
+            "content": f"<@&{DISCORD_ROLE_ID}> 🔥 Neuer Surreal.wav Release! 🎧",
             "embeds": [{
                 "title": release["name"],
-                "description": f"🎤 {release['artist']}\n🔗 [Listen on Spotify]({release['url']})",
+                "description": f"🎤 {release['artist']}\n🔗 [Auf Spotify hören]({release['url']})",
                 "color": 16711680,
                 "thumbnail": {"url": release["cover"]}
             }]
@@ -71,7 +84,7 @@ def send_alert(release):
     # Telegram
     keyboard = {
         "inline_keyboard": [[{
-            "text": "🎵 Listen Now", 
+            "text": "🎵 Jetzt streamen", 
             "url": release["url"]
         }]]
     }
@@ -87,10 +100,20 @@ def send_alert(release):
         }
     )
 
-# Telegram Command Processing
+# Telegram-Befehle verarbeiten
 def process_commands():
-    response = requests.get(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates")
+    last_processed_id = get_last_update_id()
+    new_max_id = last_processed_id
+    
+    response = requests.get(
+        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates",
+        params={"offset": last_processed_id + 1}
+    )
+    
     for update in response.json().get("result", []):
+        update_id = update["update_id"]
+        new_max_id = max(new_max_id, update_id)
+        
         if "message" in update and update["message"]["text"].startswith("/r "):
             parts = update["message"]["text"].split()
             if len(parts) == 3 and parts[1] == PROMO_CODE:
@@ -111,18 +134,20 @@ def process_commands():
                         else:
                             requests.post(
                                 f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                                json={"chat_id": update["message"]["chat"]["id"], "text": "❌ Ungültige Spotify-URL!"}
+                                json={"chat_id": update["message"]["chat"]["id"], "text": "❌ Ungültiger Spotify-Link!"}
                             )
                     else:
                         requests.post(
                             f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                            json={"chat_id": update["message"]["chat"]["id"], "text": "⚠️ Release bereits in der Datenbank!"}
+                            json={"chat_id": update["message"]["chat"]["id"], "text": "⚠️ Release wurde bereits gesendet!"}
                         )
                 except:
                     requests.post(
                         f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
                         json={"chat_id": update["message"]["chat"]["id"], "text": "❌ Fehlerhafte Eingabe!"}
                     )
+    
+    save_last_update_id(new_max_id)
 
 # Automatische Spotify-Checks
 def check_artist_releases():
