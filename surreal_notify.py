@@ -3,7 +3,7 @@ import os
 import json
 import time
 
-# ✅ Load secrets from GitHub Actions, ensuring no crashes
+# ✅ Load secrets from GitHub Actions
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "").strip() or None
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", "").strip() or None
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "").strip() or None
@@ -18,11 +18,13 @@ if not DISCORD_WEBHOOK_URL and not TELEGRAM_BOT_TOKEN:
     print("❌ ERROR: No valid notification methods available (Discord or Telegram required). Exiting.")
     exit(1)
 
-# ✅ Load last saved releases from JSON, auto-create if missing
+# ✅ Ensure the last_release.json file exists
+if not os.path.exists(LAST_RELEASE_FILE):
+    with open(LAST_RELEASE_FILE, "w") as f:
+        json.dump({"releases": []}, f)
+
+# ✅ Load last saved releases from JSON
 def load_last_releases():
-    if not os.path.exists(LAST_RELEASE_FILE):
-        with open(LAST_RELEASE_FILE, "w") as f:
-            json.dump({"releases": []}, f)
     try:
         with open(LAST_RELEASE_FILE, "r") as f:
             return json.load(f).get("releases", [])
@@ -40,7 +42,7 @@ def save_last_release(release_id):
 # 🔥 Function: Get Spotify API Token
 def get_spotify_token():
     if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
-        print("⚠️ WARNING: Spotify API credentials missing. Cannot check for new releases.")
+        print("⚠️ WARNING: Missing Spotify API credentials. Skipping Spotify checks.")
         return None
     url = "https://accounts.spotify.com/api/token"
     response = requests.post(url, data={
