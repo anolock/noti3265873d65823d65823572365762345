@@ -1,31 +1,33 @@
 name: Surreal Release Bot
 on:
   schedule:
-    - cron: "*/5 * * * *"
-  workflow_dispatch:
+    - cron: "*/5 * * * *"  # Läuft alle 5 Minuten
+  workflow_dispatch:       # Manueller Trigger
 
 jobs:
   run:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Code auschecken
         uses: actions/checkout@v4
 
-      - name: Cache Database
+      - name: Cache für Datenbanken
         uses: actions/cache@v3
         with:
-          path: processed_releases.json
-          key: db-${{ hashFiles('processed_releases.json') }}
+          path: |
+            processed_releases.json
+            last_telegram_update.txt
+          key: db-${{ hashFiles('processed_releases.json', 'last_telegram_update.txt') }}
 
-      - name: Setup Python
+      - name: Python einrichten
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
-      - name: Install Dependencies
+      - name: Abhängigkeiten installieren
         run: pip install requests
 
-      - name: Run Bot
+      - name: Bot starten
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
@@ -34,9 +36,9 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python surreal_notify.py
 
-      - name: Commit Changes
+      - name: Änderungen committen
         run: |
           git config --global user.name "GitHub Bot"
           git config --global user.email "actions@github.com"
-          git add processed_releases.json
-          git diff --quiet || (git commit -m "Update release database" && git push)
+          git add processed_releases.json last_telegram_update.txt
+          git diff --quiet || (git commit -m "Datenbank aktualisiert" && git push)
