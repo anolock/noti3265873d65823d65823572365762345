@@ -2,42 +2,35 @@ name: SurrealBot
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
-  workflow_dispatch:
+    - cron: "*/5 * * * *"  # Runs every 5 minutes
+  workflow_dispatch:       # Manual trigger
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Restore Cache (Last Release)
-        id: cache-last-release
+      - name: Cache last_release.json
         uses: actions/cache@v3
         with:
           path: last_release.json
-          key: last-release-cache
+          key: last-release-${{ hashFiles('last_release.json') }}
 
-      - name: Install Python
-        uses: actions/setup-python@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.x'
+          python-version: "3.10"
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: pip install requests
 
-      - name: Run Script
-        env:  # ✅ Load GitHub Secrets here!
+      - name: Run Notification Bot
+        env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python surreal_notify.py
-
-      - name: Save Cache (Last Release)
-        uses: actions/cache@v3
-        with:
-          path: last_release.json
-          key: last-release-cache
