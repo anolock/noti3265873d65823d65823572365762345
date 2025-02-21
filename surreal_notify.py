@@ -10,7 +10,7 @@ SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 DISCORD_ROLE_ID = "1342206955745317005"
-DB_FILE = "releases_db.json"
+DB_FILE = "processed_releases.json"
 PROMO_CODE = "4852"
 
 # Datenbank
@@ -22,11 +22,11 @@ def load_db():
         return []
 
 def save_to_db(release_id):
-    db = {"processed": load_db()}
-    if release_id not in db["processed"]:
-        db["processed"].append(release_id)
+    current = load_db()
+    if release_id not in current:
+        current.append(release_id)
         with open(DB_FILE, "w") as f:
-            json.dump(db, f, indent=2)
+            json.dump({"processed": current}, f, indent=2)
 
 # Spotify API
 def get_track_details(track_id):
@@ -95,17 +95,34 @@ def process_commands():
             parts = update["message"]["text"].split()
             if len(parts) == 3 and parts[1] == PROMO_CODE:
                 track_url = parts[2]
-                track_id = urlparse(track_url).path.split("/")[-1]
-                
-                if track_id not in load_db():
-                    track_data = get_track_details(track_id)
-                    if track_data:
-                        send_alert(track_data)
-                        save_to_db(track_id)
+                try:
+                    track_id = urlparse(track_url).path.split("/")[-1]
+                    existing = load_db()
+                    
+                    if track_id not in existing:
+                        track_data = get_track_details(track_id)
+                        if track_data:
+                            send_alert(track_data)
+                            save_to_db(track_id)
+                            requests.post(
+                                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+                                json={"chat_id": update["message"]["chat"]["id"], "text": "✅ Release gesendet!"}
+                            )
+                        else:
+                            requests.post(
+                                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+                                json={"chat_id": update["message"]["chat"]["id"], "text": "❌ Ungültige Spotify-URL!"}
+                            )
+                    else:
                         requests.post(
                             f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                            json={"chat_id": update["message"]["chat"]["id"], "text": "✅ Release gesendet!"}
+                            json={"chat_id": update["message"]["chat"]["id"], "text": "⚠️ Release bereits in der Datenbank!"}
                         )
+                except:
+                    requests.post(
+                        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+                        json={"chat_id": update["message"]["chat"]["id"], "text": "❌ Fehlerhafte Eingabe!"}
+                    )
 
 # Automatische Spotify-Checks
 def check_artist_releases():
