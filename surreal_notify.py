@@ -5,97 +5,74 @@ from urllib.parse import urlparse
 
 # ---------- Konfiguration ----------
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
-SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
-SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-LAST_RELEASE_FILE = "last_release.json"
+DATABASE_FILE = "processed_releases.json"  # Neue Datenbank
 
-# ---------- Datenbank ----------
-def load_releases():
+# ---------- Datenbank (Atomic Writing) ----------
+def load_database():
     try:
-        with open(LAST_RELEASE_FILE, "r") as f:
-            return json.load(f).get("releases", [])
+        with open(DATABASE_FILE, "r") as f:
+            return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        return []
+        return {"releases": []}
 
-def save_release(release_id):
-    releases = load_releases()
-    if release_id not in releases:
-        releases.append(release_id)
-        with open(LAST_RELEASE_FILE, "w") as f:
-            json.dump({"releases": releases}, f, indent=2)
-
-# ---------- Spotify API ----------
-def get_spotify_token():
-    response = requests.post(
-        "https://accounts.spotify.com/api/token",
-        data={"grant_type": "client_credentials"},
-        auth=(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET)
-    )
-    return response.json().get("access_token")
-
-def fetch_latest_release():
-    token = get_spotify_token()
-    if not token:
-        return None
-    
-    response = requests.get(
-        "https://api.spotify.com/v1/artists/4pqIwzgTlrlpRqHvWvNtVd/albums?include_groups=single,album&limit=1",
-        headers={"Authorization": f"Bearer {token}"}
-    )
-    
-    data = response.json()
-    if data.get("items"):
-        latest = data["items"][0]
-        return {
-            "id": latest["id"],
-            "name": latest["name"],
-            "date": latest["release_date"],
-            "url": latest["external_urls"]["spotify"],
-            "cover": latest["images"][0]["url"] if latest["images"] else ""
-        }
-    return None
+def save_to_database(release_id):
+    db = load_database()
+    if release_id not in db["releases"]:
+        db["releases"].append(release_id)
+        with open(DATABASE_FILE, "w") as f:
+            json.dump(db, f, indent=2)
 
 # ---------- Notifications ----------
-def send_discord(release):
+def send_discord(url):
     if not DISCORD_WEBHOOK_URL:
         return
     
     embed = {
-        "content": f"🔥 **Neuer Release!** {release['name']}",
+        "content": "🔥 **NEUER RELEASE** 🔥",
         "embeds": [{
-            "title": release["name"],
-            "url": release["url"],
-            "thumbnail": {"url": release["cover"]}
+            "title": "JETZT STREAMEN!",
+            "url": url,
+            "color": 0xFF0000
         }]
     }
     requests.post(DISCORD_WEBHOOK_URL, json=embed)
 
-def send_telegram(release):
+def send_telegram(url):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return
     
-    keyboard = {"inline_keyboard": [[{"text": "🎵 Spotify", "url": release["url"]}]]}
-    
     requests.post(
-        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto",
-        data={
+        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+        json={
             "chat_id": TELEGRAM_CHAT_ID,
-            "photo": release["cover"],
-            "caption": f"🔥 *{release['name']}*\n📅 {release['date']}",
-            "parse_mode": "Markdown",
-            "reply_markup": json.dumps(keyboard)
+            "text": f"🔥 *NEUER RELEASE* 🔥\n[Spotify Link]({url})",
+            "parse_mode": "Markdown"
         }
     )
 
-# ---------- Hauptlogik ----------
+# ---------- Telegram Command ----------
+def process_commands():
+    response = requests.get(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates").json()
+    for update in response.get("result", []):
+        if "message" in update and update["message"].get("text", "").startswith("/promote"):
+            url = update["message"]["text"].split()[-1]
+            release_id = urlparse(url).path.split("/")[-1]
+            
+            if release_id not in load_database()["releases"]:
+                send_discord(url)
+                send_telegram(url)
+                save_to_database(release_id)
+                
+                # Bestätigung senden
+                requests.post(
+                    f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+                    json={
+                        "chat_id": update["message"]["chat"]["id"],
+                        "text": "✅ Release wurde gesendet!"
+                    }
+                )
+
 if __name__ == "__main__":
-    latest_release = fetch_latest_release()
-    if latest_release:
-        existing_releases = load_releases()
-        
-        if latest_release["id"] not in existing_releases:
-            send_discord(latest_release)
-            send_telegram(latest_release)
-            save_release(latest_release["id"])
+    process_commands()
