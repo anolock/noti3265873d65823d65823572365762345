@@ -3,7 +3,7 @@ import os
 import json
 import time
 
-# ✅ Debugging: Print loaded secrets
+# Debugging: Print loaded secrets
 print("🚀 DEBUG: Checking environment variables...")
 
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
@@ -12,33 +12,27 @@ SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "").strip()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 
-# 🔥 Debugging Output (DO NOT LOG SENSITIVE INFO LIKE TOKENS)
+# Debugging Output (DO NOT LOG SENSITIVE INFO LIKE TOKENS)
 print(f"🔍 DISCORD_WEBHOOK_URL Loaded: {'✅' if DISCORD_WEBHOOK_URL else '❌ MISSING'}")
 print(f"🔍 SPOTIFY_CLIENT_ID Loaded: {'✅' if SPOTIFY_CLIENT_ID else '❌ MISSING'}")
 print(f"🔍 SPOTIFY_CLIENT_SECRET Loaded: {'✅' if SPOTIFY_CLIENT_SECRET else '❌ MISSING'}")
 print(f"🔍 TELEGRAM_BOT_TOKEN Loaded: {'✅' if TELEGRAM_BOT_TOKEN else '❌ MISSING'}")
 print(f"🔍 TELEGRAM_CHAT_ID Loaded: {'✅' if TELEGRAM_CHAT_ID else '❌ MISSING'}")
 
-# ✅ Ensure at least one service is available
+# Ensure at least one service is available
 if not DISCORD_WEBHOOK_URL and not TELEGRAM_BOT_TOKEN:
     print("❌ ERROR: No valid notification methods available (Discord or Telegram required). Exiting.")
     exit(1)
-
 
 DISCORD_ROLE_ID = "1342206955745317005"  # Discord role for notifications
 LAST_RELEASE_FILE = "last_release.json"  # JSON file to track releases
 
-# ✅ Ensure at least one service is available
-if not DISCORD_WEBHOOK_URL and not TELEGRAM_BOT_TOKEN:
-    print("❌ ERROR: No valid notification methods available (Discord or Telegram required). Exiting.")
-    exit(1)
-
-# ✅ Ensure the last_release.json file exists
+# Ensure the last_release.json file exists
 if not os.path.exists(LAST_RELEASE_FILE):
     with open(LAST_RELEASE_FILE, "w") as f:
         json.dump({"releases": []}, f)
 
-# ✅ Load last saved releases from JSON
+# Load last saved releases from JSON
 def load_last_releases():
     try:
         with open(LAST_RELEASE_FILE, "r") as f:
@@ -46,7 +40,7 @@ def load_last_releases():
     except json.JSONDecodeError:
         return []
 
-# ✅ Save new release to JSON
+# Save new release to JSON
 def save_last_release(release_id):
     releases = load_last_releases()
     if release_id not in releases:
@@ -54,7 +48,7 @@ def save_last_release(release_id):
         with open(LAST_RELEASE_FILE, "w") as f:
             json.dump({"releases": releases}, f)
 
-# 🔥 Function: Get Spotify API Token
+# Function: Get Spotify API Token
 def get_spotify_token():
     if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
         print("⚠️ WARNING: Missing Spotify API credentials. Skipping Spotify checks.")
@@ -67,7 +61,7 @@ def get_spotify_token():
     }, headers={"Content-Type": "application/x-www-form-urlencoded"})
     return response.json().get("access_token")
 
-# 🔥 Function: Check for new releases
+# Function: Check for new releases
 def check_new_release():
     token = get_spotify_token()
     if not token:
@@ -84,7 +78,7 @@ def check_new_release():
         return latest["id"], latest["name"], latest["release_date"], latest["external_urls"]["spotify"], latest["images"][0]["url"]
     return None, None, None, None, None
 
-# 🔥 Function: Send Discord Notification
+# Function: Send Discord Notification
 def send_discord_notification(album_name, release_date, spotify_url, cover_url):
     if not DISCORD_WEBHOOK_URL:
         print("⚠️ WARNING: Discord webhook missing. Skipping Discord notification.")
@@ -103,7 +97,7 @@ def send_discord_notification(album_name, release_date, spotify_url, cover_url):
     
     requests.post(DISCORD_WEBHOOK_URL, json=embed, headers={"Content-Type": "application/json"})
 
-# 🔥 Function: Send Telegram Notification
+# Function: Send Telegram Notification
 def send_telegram_notification(album_name, release_date, spotify_url, cover_url):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         print("⚠️ WARNING: Telegram credentials missing. Skipping Telegram notification.")
@@ -111,7 +105,7 @@ def send_telegram_notification(album_name, release_date, spotify_url, cover_url)
 
     base_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
     
-    # 📸 Send image with caption
+    # Send image with caption
     message_text = (
         f"🔥 **New Surreal.wav Release!** 🎧\n\n"
         f"🎵 *{album_name}*\n"
@@ -127,7 +121,7 @@ def send_telegram_notification(album_name, release_date, spotify_url, cover_url)
     
     requests.post(f"{base_url}/sendPhoto", data=payload)
 
-    # 🎵 Add Spotify button
+    # Add Spotify button
     keyboard = {
         "inline_keyboard": [[{"text": "🎶 Listen on Spotify", "url": spotify_url}]]
     }
@@ -141,7 +135,7 @@ def send_telegram_notification(album_name, release_date, spotify_url, cover_url)
     
     requests.post(f"{base_url}/sendMessage", data=button_payload)
 
-# 🔥 Function: Process Telegram Commands
+# Function: Process Telegram Commands
 def process_telegram_commands():
     if not TELEGRAM_BOT_TOKEN:
         return  # Skip if Telegram isn't configured
@@ -174,10 +168,10 @@ def process_telegram_commands():
                             "text": confirmation_text
                         })
 
-# ✅ Process Telegram commands before checking for releases
+# Process Telegram commands before checking for releases
 process_telegram_commands()
 
-# ✅ Check for new releases
+# Check for new releases
 last_releases = load_last_releases()
 release_id, album_name, release_date, spotify_url, cover_url = check_new_release()
 
