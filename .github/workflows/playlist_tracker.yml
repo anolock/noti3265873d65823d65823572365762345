@@ -11,13 +11,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - name: Cache Daten
+        uses: actions/cache@v3
         with:
-          python-version: "3.10"
-
-      - name: Install Dependencies
-        run: pip install requests
+          path: |
+            tracked_playlists.json
+            last_telegram_update.txt
+          key: playlist-data-${{ hashFiles('tracked_playlists.json', 'last_telegram_update.txt') }}
 
       - name: Run Tracker
         env:
@@ -25,4 +25,5 @@ jobs:
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python playlist_tracker.py
