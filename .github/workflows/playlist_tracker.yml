@@ -21,7 +21,7 @@ jobs:
 
       - name: Run Tracker
         env:
-          DISCORD_PLAYLIST_WEBHOOK: ${{ secrets.DISCORD_PLAYLIST_WEBHOOK }}
+          DISCORD_PLAYLIST_WEBHOOK2: ${{ secrets.DISCORD_PLAYLIST_WEBHOOK2 }}
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
