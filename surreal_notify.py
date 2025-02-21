@@ -11,7 +11,7 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 DISCORD_ROLE_ID = "1342206955745317005"
 DB_FILE = "releases_db.json"
-PROMO_CODE = "4852"  # Dein fester Code
+PROMO_CODE = "4852"
 
 # Datenbank
 def load_db():
@@ -61,7 +61,7 @@ def send_alert(release):
             "content": f"<@&{DISCORD_ROLE_ID}> 🔥 New Surreal.wav Release! 🎧",
             "embeds": [{
                 "title": release["name"],
-                "description": f"🎤 {release['artist']}\n📅 Release Date: {release.get('date', 'N/A')}\n🔗 [Listen on Spotify]({release['url']})",
+                "description": f"🎤 {release['artist']}\n🔗 [Listen on Spotify]({release['url']})",
                 "color": 16711680,
                 "thumbnail": {"url": release["cover"]}
             }]
@@ -74,7 +74,7 @@ def send_alert(release):
         data={
             "chat_id": TELEGRAM_CHAT_ID,
             "photo": release["cover"],
-            "caption": f"🔥 *New Release!* 🎧\n\n**{release['name']}**\n🎤 {release['artist']}\n📅 {release.get('date', 'N/A')}",
+            "caption": f"🔥 *New Release!* 🎧\n\n**{release['name']}**\n🎤 {release['artist']}",
             "parse_mode": "Markdown"
         }
     )
@@ -119,7 +119,6 @@ def check_artist_releases():
             "id": latest_album["id"],
             "name": latest_album["name"],
             "artist": "Surreal.wav",
-            "date": latest_album["release_date"],
             "url": latest_album["external_urls"]["spotify"],
             "cover": latest_album["images"][0]["url"]
         }
