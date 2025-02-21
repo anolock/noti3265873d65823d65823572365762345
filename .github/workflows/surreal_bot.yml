@@ -1,11 +1,11 @@
-name: Surreal.wav Notifier
+name: Surreal Release Bot
 on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
 
 jobs:
-  notify:
+  run:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -14,8 +14,8 @@ jobs:
       - name: Cache Database
         uses: actions/cache@v3
         with:
-          path: releases_db.json
-          key: db-${{ hashFiles('releases_db.json') }}
+          path: processed_releases.json
+          key: db-${{ hashFiles('processed_releases.json') }}
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -25,7 +25,7 @@ jobs:
       - name: Install Dependencies
         run: pip install requests
 
-      - name: Run Notifier
+      - name: Run Bot
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
@@ -38,5 +38,5 @@ jobs:
         run: |
           git config --global user.name "GitHub Bot"
           git config --global user.email "actions@github.com"
-          git add releases_db.json
+          git add processed_releases.json
           git diff --quiet || (git commit -m "Update release database" && git push)
