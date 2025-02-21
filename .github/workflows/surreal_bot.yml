@@ -1,17 +1,15 @@
-name: Surreal Release Bot
+name: Surreal.wav Notifier
 on:
   schedule:
-    - cron: "*/5 * * * *"  # Alle 5 Minuten
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 jobs:
-  run:
+  notify:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          persist-credentials: false
 
       - name: Cache Database
         uses: actions/cache@v3
@@ -25,16 +23,15 @@ jobs:
           python-version: "3.10"
 
       - name: Install Dependencies
-        run: pip install requests python-dotenv
+        run: pip install requests
 
-      - name: Run Bot
+      - name: Run Notifier
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          PROMOTION_CODE: ${{ secrets.PROMOTION_CODE }}
         run: python surreal_notify.py
 
       - name: Commit Changes
