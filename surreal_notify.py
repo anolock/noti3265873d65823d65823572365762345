@@ -162,6 +162,11 @@ def process_telegram_commands():
                         else:
                             save_last_release(album_id)
                             confirmation_text = f"✅ Release manually added: {spotify_url}"
+                            # Send notifications for manually added release
+                            release_id, album_name, release_date, spotify_url, cover_url = check_new_release()
+                            if release_id:
+                                send_discord_notification(album_name, release_date, spotify_url, cover_url)
+                                send_telegram_notification(album_name, release_date, spotify_url, cover_url)
 
                         requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", data={
                             "chat_id": chat_id,
