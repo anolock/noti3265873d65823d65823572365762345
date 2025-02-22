@@ -8,7 +8,7 @@ DISCORD_PLAYLIST_WEBHOOK2 = os.getenv("DISCORD_PLAYLIST_WEBHOOK2")
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")  # Deine persönliche Chat-ID
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 TRACKED_PLAYLISTS_FILE = "tracked_playlists.json"
 MILESTONES = [1000, 5000, 10000, 25000, 50000]
 PROMO_CODE = "4852"
@@ -38,19 +38,34 @@ def save_playlists(data):
         json.dump(data, f, indent=2)
 
 # Discord-Benachrichtigung
-def send_discord_add_notification(playlist_id, name, followers, cover_url):
-    requests.post(
-        DISCORD_PLAYLIST_WEBHOOK2,
-        json={
-            "content": "🎵 **Playlist Added**",
-            "embeds": [{
-                "title": name,
-                "description": f"🔗 [Open Playlist](https://open.spotify.com/playlist/{playlist_id})\n👥 Follower: {followers}",
-                "color": 5763719,
-                "thumbnail": {"url": cover_url}
-            }]
-        }
-    )
+def send_discord_notification(playlist_id, name, followers, cover_url, is_milestone=False, milestone=0):
+    if is_milestone:
+        mention = "<@&ROLLE>" if milestone >= 10000 else "@here" if milestone >= 5000 else ""
+        requests.post(
+            DISCORD_PLAYLIST_WEBHOOK2,
+            json={
+                "content": f"{mention} 🚀 Playlist Milestone: {milestone} Follower!",
+                "embeds": [{
+                    "title": name,
+                    "description": f"🔗 [Open Playlist](https://open.spotify.com/playlist/{playlist_id})",
+                    "color": 16711680,
+                    "thumbnail": {"url": cover_url}
+                }]
+            }
+        )
+    else:
+        requests.post(
+            DISCORD_PLAYLIST_WEBHOOK2,
+            json={
+                "content": "🎵 **Playlist Added**",
+                "embeds": [{
+                    "title": name,
+                    "description": f"🔗 [Open Playlist](https://open.spotify.com/playlist/{playlist_id})\n👥 Follower: {followers}",
+                    "color": 5763719,
+                    "thumbnail": {"url": cover_url}
+                }]
+            }
+        )
 
 # Telegram-Benachrichtigung
 def send_telegram_message(chat_id, text):
@@ -59,7 +74,7 @@ def send_telegram_message(chat_id, text):
         json={
             "chat_id": chat_id,
             "text": text,
-            "parse_mode": "Markdown"  # Für Links und Formatierung
+            "parse_mode": "Markdown"
         }
     )
 
@@ -101,7 +116,6 @@ def handle_playlist_command(url, chat_id):
             send_telegram_message(chat_id, "❌ *Invalid playlist URL!*")
             return
         
-        # Speichern und Benachrichtigungen senden
         data["playlists"][playlist_id] = {
             "name": playlist["name"],
             "current_followers": playlist["followers"]["total"],
@@ -110,8 +124,7 @@ def handle_playlist_command(url, chat_id):
         }
         save_playlists(data)
         
-        # Discord & Telegram Benachrichtigungen
-        send_discord_add_notification(
+        send_discord_notification(
             playlist_id,
             playlist["name"],
             playlist["followers"]["total"],
@@ -120,7 +133,6 @@ def handle_playlist_command(url, chat_id):
         send_telegram_message(TELEGRAM_CHAT_ID, "✅ *Playlist added to tracking!*")
 
     except Exception as e:
-        print(f"Error: {str(e)}")
         send_telegram_message(chat_id, "❌ *Failed to add playlist!*")
 
 # Befehle verarbeiten
@@ -174,17 +186,13 @@ def check_milestones():
         
         for milestone in MILESTONES:
             if current >= milestone and milestone not in playlist["milestones"]:
-                requests.post(
-                    DISCORD_PLAYLIST_WEBHOOK2,
-                    json={
-                        "content": f"🚀 *Playlist Milestone: {milestone} Follower!*",
-                        "embeds": [{
-                            "title": playlist["name"],
-                            "description": f"🔗 [Open Playlist](https://open.spotify.com/playlist/{playlist_id})",
-                            "color": 16711680,
-                            "thumbnail": {"url": playlist["cover"]}
-                        }]
-                    }
+                send_discord_notification(
+                    playlist_id,
+                    playlist["name"],
+                    current,
+                    playlist["cover"],
+                    is_milestone=True,
+                    milestone=milestone
                 )
                 playlist["milestones"].append(milestone)
         
