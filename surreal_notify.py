@@ -29,6 +29,10 @@ def save_to_db(release_id):
         with open(DB_FILE, "w") as f:
             json.dump({"processed": current}, f, indent=2)
 
+def clear_db():
+    with open(DB_FILE, "w") as f:
+        json.dump({"processed": []}, f, indent=2)
+
 # Telegram Update-Tracking
 def get_last_update_id():
     try:
@@ -40,6 +44,10 @@ def get_last_update_id():
 def save_last_update_id(update_id):
     with open(LAST_UPDATE_FILE, "w") as f:
         f.write(str(update_id))
+
+def clear_last_update_id():
+    with open(LAST_UPDATE_FILE, "w") as f:
+        f.write("0")
 
 # Spotify API
 def get_track_details(track_id):
@@ -118,7 +126,19 @@ def process_commands():
             
             if "message" in update:
                 text = update["message"].get("text", "")
-                if text.startswith("/r ") and len(text.split()) == 3:
+                chat_id = update["message"]["chat"]["id"]
+                
+                if text.startswith("/r clear"):
+                    clear_db()
+                    clear_last_update_id()
+                    save_last_update_id(update_id)  # Wichtig: Update-ID sofort speichern!
+                    requests.post(
+                        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+                        json={"chat_id": chat_id, "text": "✅ Datenbank und Update-ID zurückgesetzt!"}
+                    )
+                    break  # Verlasse die Schleife, um weitere Befehle zu ignorieren
+                
+                elif text.startswith("/r ") and len(text.split()) == 3:
                     parts = text.split()
                     promo_code, track_url = parts[1], parts[2]
                     
@@ -133,7 +153,7 @@ def process_commands():
                                 save_to_db(track_id)
                                 requests.post(
                                     f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                                    json={"chat_id": update["message"]["chat"]["id"], "text": "✅ Release gesendet!"}
+                                    json={"chat_id": chat_id, "text": "✅ Release gesendet!"}
                                 )
     
     except Exception as e:
