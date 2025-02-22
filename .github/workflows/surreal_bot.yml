@@ -2,7 +2,7 @@ name: Surreal Release Bot
 on:
   schedule:
     - cron: "*/5 * * * *"  # Läuft alle 5 Minuten
-  workflow_dispatch:       # Manueller Trigger
+  workflow_dispatch:
 
 jobs:
   run:
