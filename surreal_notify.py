@@ -128,7 +128,7 @@ def process_commands():
                 text = update["message"].get("text", "")
                 chat_id = update["message"]["chat"]["id"]
                 
-                if text.startswith("/r clear"):
+                if text.startswith("/r reset"):
                     clear_db()
                     clear_last_update_id()
                     save_last_update_id(update_id)  # Wichtig: Update-ID sofort speichern!
