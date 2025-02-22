@@ -5,6 +5,9 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
+permissions:  # Korrekte Position der Permissions
+  contents: write
+
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -25,6 +28,12 @@ jobs:
           key: db-${{ hashFiles('processed_releases.json', 'last_telegram_update.txt') }}
           restore-keys: db-
 
+      - name: Tracking-Dateien initialisieren
+        run: |
+          touch processed_releases.json last_telegram_update.txt
+          if [ ! -s processed_releases.json ]; then echo "[]" > processed_releases.json; fi
+          if [ ! -s last_telegram_update.txt ]; then echo "0" > last_telegram_update.txt; fi
+
       - name: Python einrichten
         uses: actions/setup-python@v4
         with:
@@ -43,14 +52,16 @@ jobs:
         run: python surreal_notify.py
 
       - name: Änderungen committen
-        if: always()
+        if: success()  # Nur bei Erfolg ausführen
         run: |
-          git config --global user.name "GitHub Bot"
-          git config --global user.email "github-actions@example.com"
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
-          # Nur committen wenn es Änderungen gibt
           git add processed_releases.json last_telegram_update.txt
-          git diff --quiet && git diff --staged --quiet || git commit -m "Update tracking files"
-          git push
-          permissions:
-  contents: write  # Füge dies am Anfang der Workflow-Datei hinzu
+          
+          if git diff --staged --quiet; then
+            echo "Keine Änderungen zum Committen"
+          else
+            git commit -m "Automatisches Update der Tracking-Daten"
+            git push origin HEAD:main
+          fi
