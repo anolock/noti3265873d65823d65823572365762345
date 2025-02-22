@@ -2,11 +2,11 @@ name: Surreal Notifier
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
-  workflow_dispatch:
+    - cron: '*/5 * * * *'  # Alle 5 Minuten
+  workflow_dispatch:  # Manueller Trigger
 
 permissions:
-  contents: write
+  contents: write  # Schreibrechte für Commits
 
 jobs:
   run:
@@ -17,12 +17,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-          fetch-depth: 0  # Für korrekte Git-Historie
+          fetch-depth: 0  # Für komplette Git-Historie
 
       - name: Tracking-Dateien initialisieren
         run: |
-          if [ ! -f processed_releases.json ]; then echo "[]" > processed_releases.json; fi
-          if [ ! -f last_telegram_update.txt ]; then echo "0" > last_telegram_update.txt; fi
+          if [ ! -f processed_releases.json ]; then 
+            echo '{"processed": []}' > processed_releases.json
+          fi
+          if [ ! -f last_telegram_update.txt ]; then 
+            echo "0" > last_telegram_update.txt
+          fi
 
       - name: Cache für Datenbanken
         uses: actions/cache@v3
@@ -63,8 +67,9 @@ jobs:
           git add processed_releases.json last_telegram_update.txt
           
           if ! git diff --staged --quiet; then
-            git commit -m "Automatisches Update der Tracking-Daten"
-            git pull --rebase  # Konflikte vermeiden
+            git commit -m "Automatisches Update der Tracking-Daten [skip ci]"
+            git remote set-url origin https://x-access-token:$GH_TOKEN@github.com/${{ github.repository }}.git
+            git pull --rebase
             git push origin HEAD:main
           else
             echo "Keine Änderungen zum Committen"
