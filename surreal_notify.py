@@ -18,7 +18,8 @@ PROMO_CODE = "4852"
 def load_db():
     try:
         with open(DB_FILE, "r") as f:
-            return json.load(f).get("processed", [])
+            data = json.load(f)
+            return data.get("processed", [])
     except:
         return []
 
