@@ -52,3 +52,5 @@ jobs:
           git add processed_releases.json last_telegram_update.txt
           git diff --quiet && git diff --staged --quiet || git commit -m "Update tracking files"
           git push
+          permissions:
+  contents: write  # Füge dies am Anfang der Workflow-Datei hinzu
