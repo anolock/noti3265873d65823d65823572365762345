@@ -105,47 +105,39 @@ def process_commands():
     last_processed_id = get_last_update_id()
     new_max_id = last_processed_id
     
-    response = requests.get(
-        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates",
-        params={"offset": last_processed_id + 1}
-    )
-    
-    for update in response.json().get("result", []):
-        update_id = update["update_id"]
-        new_max_id = max(new_max_id, update_id)
+    try:
+        response = requests.get(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates",
+            params={"offset": last_processed_id + 1, "timeout": 10}
+        )
+        updates = response.json().get("result", [])
         
-        if "message" in update and update["message"]["text"].startswith("/r "):
-            parts = update["message"]["text"].split()
-            if len(parts) == 3 and parts[1] == PROMO_CODE:
-                track_url = parts[2]
-                try:
-                    track_id = urlparse(track_url).path.split("/")[-1]
-                    existing = load_db()
+        for update in updates:
+            update_id = update["update_id"]
+            new_max_id = max(new_max_id, update_id)
+            
+            if "message" in update:
+                text = update["message"].get("text", "")
+                if text.startswith("/r ") and len(text.split()) == 3:
+                    parts = text.split()
+                    promo_code, track_url = parts[1], parts[2]
                     
-                    if track_id not in existing:
-                        track_data = get_track_details(track_id)
-                        if track_data:
-                            send_alert(track_data)
-                            save_to_db(track_id)
-                            requests.post(
-                                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                                json={"chat_id": update["message"]["chat"]["id"], "text": "✅ Release gesendet!"}
-                            )
-                        else:
-                            requests.post(
-                                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                                json={"chat_id": update["message"]["chat"]["id"], "text": "❌ Ungültiger Spotify-Link!"}
-                            )
-                    else:
-                        requests.post(
-                            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                            json={"chat_id": update["message"]["chat"]["id"], "text": "⚠️ Release wurde bereits gesendet!"}
-                        )
-                except:
-                    requests.post(
-                        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                        json={"chat_id": update["message"]["chat"]["id"], "text": "❌ Fehlerhafte Eingabe!"}
-                    )
+                    if promo_code == PROMO_CODE:
+                        track_id = urlparse(track_url).path.split("/")[-1]
+                        existing = load_db()
+                        
+                        if track_id not in existing:
+                            track_data = get_track_details(track_id)
+                            if track_data:
+                                send_alert(track_data)
+                                save_to_db(track_id)
+                                requests.post(
+                                    f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+                                    json={"chat_id": update["message"]["chat"]["id"], "text": "✅ Release gesendet!"}
+                                )
+    
+    except Exception as e:
+        print(f"Fehler: {str(e)}")
     
     save_last_update_id(new_max_id)
 
