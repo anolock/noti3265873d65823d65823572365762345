@@ -2,7 +2,7 @@ name: Surreal Release Bot
 on:
   schedule:
     - cron: "*/5 * * * *"  # Läuft alle 5 Minuten
-  workflow_dispatch:
+  workflow_dispatch:       # Manueller Trigger
 
 jobs:
   run:
@@ -18,6 +18,7 @@ jobs:
             processed_releases.json
             last_telegram_update.txt
           key: db-${{ hashFiles('processed_releases.json', 'last_telegram_update.txt') }}
+          restore-keys: db-
 
       - name: Python einrichten
         uses: actions/setup-python@v4
