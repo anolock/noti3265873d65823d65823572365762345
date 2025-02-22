@@ -29,10 +29,6 @@ def save_to_db(release_id):
         with open(DB_FILE, "w") as f:
             json.dump({"processed": current}, f, indent=2)
 
-def clear_db():
-    with open(DB_FILE, "w") as f:
-        json.dump({"processed": []}, f, indent=2)
-
 # Telegram Update-Tracking
 def get_last_update_id():
     try:
@@ -44,10 +40,6 @@ def get_last_update_id():
 def save_last_update_id(update_id):
     with open(LAST_UPDATE_FILE, "w") as f:
         f.write(str(update_id))
-
-def clear_last_update_id():
-    with open(LAST_UPDATE_FILE, "w") as f:
-        f.write("0")
 
 # Spotify API
 def get_track_details(track_id):
@@ -73,16 +65,16 @@ def get_track_details(track_id):
         }
     return None
 
-# Benachrichtigungen
+# Benachrichtigungen (Englisch)
 def send_alert(release):
     # Discord
     requests.post(
         DISCORD_WEBHOOK_URL,
         json={
-            "content": f"<@&{DISCORD_ROLE_ID}> 🔥 Neuer Surreal.wav Release! 🎧",
+            "content": f"<@&{DISCORD_ROLE_ID}> 🔥 New Surreal.wav Release! 🎧",
             "embeds": [{
                 "title": release["name"],
-                "description": f"🎤 {release['artist']}\n🔗 [Auf Spotify hören]({release['url']})",
+                "description": f"🎤 {release['artist']}\n🔗 [Listen on Spotify]({release['url']})",
                 "color": 16711680,
                 "thumbnail": {"url": release["cover"]}
             }]
@@ -92,7 +84,7 @@ def send_alert(release):
     # Telegram
     keyboard = {
         "inline_keyboard": [[{
-            "text": "🎵 Jetzt streamen", 
+            "text": "🎵 Stream now", 
             "url": release["url"]
         }]]
     }
@@ -108,7 +100,7 @@ def send_alert(release):
         }
     )
 
-# Telegram-Befehle verarbeiten
+# Telegram-Befehle verarbeiten (Deutsch)
 def process_commands():
     last_processed_id = get_last_update_id()
     new_max_id = last_processed_id
@@ -128,17 +120,7 @@ def process_commands():
                 text = update["message"].get("text", "")
                 chat_id = update["message"]["chat"]["id"]
                 
-                if text.startswith("/r reset"):
-                    clear_db()
-                    clear_last_update_id()
-                    save_last_update_id(update_id)  # Wichtig: Update-ID sofort speichern!
-                    requests.post(
-                        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                        json={"chat_id": chat_id, "text": "✅ Datenbank und Update-ID zurückgesetzt!"}
-                    )
-                    break  # Verlasse die Schleife, um weitere Befehle zu ignorieren
-                
-                elif text.startswith("/r ") and len(text.split()) == 3:
+                if text.startswith("/r ") and len(text.split()) == 3:
                     parts = text.split()
                     promo_code, track_url = parts[1], parts[2]
                     
@@ -155,6 +137,16 @@ def process_commands():
                                     f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
                                     json={"chat_id": chat_id, "text": "✅ Release gesendet!"}
                                 )
+                            else:
+                                requests.post(
+                                    f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+                                    json={"chat_id": chat_id, "text": "❌ Ungültiger Spotify-Link!"}
+                                )
+                        else:
+                            requests.post(
+                                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+                                json={"chat_id": chat_id, "text": "⚠️ Release wurde bereits gesendet!"}
+                            )
     
     except Exception as e:
         print(f"Fehler: {str(e)}")
