@@ -3,7 +3,6 @@ name: Surreal Notifier
 on:
   schedule:
     - cron: '*/5 * * * *'  # Alle 5 Minuten
-  workflow_dispatch:  # Manueller Trigger
 
 permissions:
   contents: write  # Schreibrechte für Commits
