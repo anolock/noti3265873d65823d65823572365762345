@@ -1,189 +1,79 @@
-import requests
-import os
-import json
-from urllib.parse import urlparse
+name: Surreal Notifier
 
-# Konfiguration
-DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
-SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
-SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-DISCORD_ROLE_ID = "1342206955745317005"
-DB_FILE = "processed_releases.json"
-LAST_UPDATE_FILE = "last_telegram_update.txt"
-PROMO_CODE = "4852"
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # Alle 5 Minuten
+  workflow_dispatch:
 
-# Datenbank
-def load_db():
-    try:
-        with open(DB_FILE, "r") as f:
-            data = json.load(f)
-            return data.get("processed", [])
-    except:
-        return []
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
-def save_to_db(release_id):
-    current = load_db()
-    if release_id not in current:
-        current.append(release_id)
-        with open(DB_FILE, "w") as f:
-            json.dump({"processed": current}, f, indent=2)
+permissions:
+  contents: write
 
-# Telegram Update-Tracking
-def get_last_update_id():
-    try:
-        with open(LAST_UPDATE_FILE, "r") as f:
-            return int(f.read().strip())
-    except:
-        return 0
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
 
-def save_last_update_id(update_id):
-    with open(LAST_UPDATE_FILE, "w") as f:
-        f.write(str(update_id))
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
 
-# Spotify API
-def get_track_details(track_id):
-    token = requests.post(
-        "https://accounts.spotify.com/api/token",
-        auth=(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET),
-        data={"grant_type": "client_credentials"}
-    ).json().get("access_token")
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
 
-    response = requests.get(
-        f"https://api.spotify.com/v1/tracks/{track_id}",
-        headers={"Authorization": f"Bearer {token}"}
-    )
-    
-    if response.status_code == 200:
-        track = response.json()
-        return {
-            "id": track["id"],
-            "name": track["name"],
-            "artist": track["artists"][0]["name"],
-            "url": track["external_urls"]["spotify"],
-            "cover": track["album"]["images"][0]["url"]
-        }
-    return None
+      - name: Install dependencies
+        run: pip install requests
 
-# Benachrichtigungen (Englisch)
-def send_alert(release):
-    # Discord
-    requests.post(
-        DISCORD_WEBHOOK_URL,
-        json={
-            "content": f"<@&{DISCORD_ROLE_ID}> 🔥 New Surreal.wav Release! 🎧",
-            "embeds": [{
-                "title": release["name"],
-                "description": f"🎤 {release['artist']}\n🔗 [Listen on Spotify]({release['url']})",
-                "color": 16711680,
-                "thumbnail": {"url": release["cover"]}
-            }]
-        }
-    )
+      - name: Datenbank initialisieren
+        run: |
+          mkdir -p db
+          [ -f db/processed_releases.json ] || echo '{"processed":[]}' > db/processed_releases.json
+          [ -f db/last_telegram_update.txt ] || echo "0" > db/last_telegram_update.txt
 
-    # Telegram
-    keyboard = {
-        "inline_keyboard": [[{
-            "text": "🎵 Stream now", 
-            "url": release["url"]
-        }]]
-    }
-    
-    requests.post(
-        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto",
-        data={
-            "chat_id": TELEGRAM_CHAT_ID,
-            "photo": release["cover"],
-            "caption": f"🔥 *{release['name']}*\n🎤 {release['artist']}",
-            "parse_mode": "Markdown",
-            "reply_markup": json.dumps(keyboard)
-        }
-    )
+      - name: Cache laden
+        uses: actions/cache@v3
+        id: cache
+        with:
+          path: |
+            db/processed_releases.json
+            db/last_telegram_update.txt
+          key: db-${{ hashFiles('db/processed_releases.json', 'db/last_telegram_update.txt') }}
+          restore-keys: db-
 
-# Telegram-Befehle verarbeiten (Deutsch)
-def process_commands():
-    last_processed_id = get_last_update_id()
-    new_max_id = last_processed_id
-    
-    try:
-        response = requests.get(
-            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates",
-            params={"offset": last_processed_id + 1, "timeout": 10}
-        )
-        updates = response.json().get("result", [])
-        
-        for update in updates:
-            update_id = update["update_id"]
-            new_max_id = max(new_max_id, update_id)
-            
-            if "message" in update:
-                text = update["message"].get("text", "")
-                chat_id = update["message"]["chat"]["id"]
-                
-                if text.startswith("/r ") and len(text.split()) == 3:
-                    parts = text.split()
-                    promo_code, track_url = parts[1], parts[2]
-                    
-                    if promo_code == PROMO_CODE:
-                        track_id = urlparse(track_url).path.split("/")[-1]
-                        existing = load_db()
-                        
-                        if track_id not in existing:
-                            track_data = get_track_details(track_id)
-                            if track_data:
-                                send_alert(track_data)
-                                save_to_db(track_id)
-                                requests.post(
-                                    f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                                    json={"chat_id": chat_id, "text": "✅ Release gesendet!"}
-                                )
-                            else:
-                                requests.post(
-                                    f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                                    json={"chat_id": chat_id, "text": "❌ Ungültiger Spotify-Link!"}
-                                )
-                        else:
-                            requests.post(
-                                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                                json={"chat_id": chat_id, "text": "⚠️ Release wurde bereits gesendet!"}
-                            )
-    
-    except Exception as e:
-        print(f"Fehler: {str(e)}")
-    
-    save_last_update_id(new_max_id)
+      - name: Bot ausführen
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          for i in {1..3}; do
+            python surreal_notify.py
+            if [ $? -eq 0 ]; then
+              exit 0
+            fi
+            echo "Versuch $i fehlgeschlagen, wiederhole in 10s..."
+            sleep 10
+          done
+          exit 1
 
-# Automatische Spotify-Checks
-def check_artist_releases():
-    token = requests.post(
-        "https://accounts.spotify.com/api/token",
-        auth=(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET),
-        data={"grant_type": "client_credentials"}
-    ).json().get("access_token")
-
-    response = requests.get(
-        "https://api.spotify.com/v1/artists/4pqIwzgTlrlpRqHvWvNtVd/albums",
-        headers={"Authorization": f"Bearer {token}"},
-        params={"include_groups": "single,album", "limit": 1}
-    )
-    
-    if response.status_code == 200:
-        latest_album = response.json()["items"][0]
-        return {
-            "id": latest_album["id"],
-            "name": latest_album["name"],
-            "artist": "Surreal.wav",
-            "url": latest_album["external_urls"]["spotify"],
-            "cover": latest_album["images"][0]["url"]
-        }
-    return None
-
-# Hauptlogik
-if __name__ == "__main__":
-    process_commands()
-    
-    latest = check_artist_releases()
-    if latest and latest["id"] not in load_db():
-        send_alert(latest)
-        save_to_db(latest["id"])
+      - name: Änderungen pushen
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "GitHub Bot"
+          git config --global user.email "actions@github.com"
+          git add db/
+          git commit -m "Update: $(date +'%Y-%m-%d %H:%M:%S')" || echo "Keine Änderungen"
+          git pull --rebase
+          git push origin HEAD:main
