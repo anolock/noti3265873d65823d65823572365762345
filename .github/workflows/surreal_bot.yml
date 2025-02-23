@@ -2,18 +2,21 @@ name: Surreal Notifier
 
 on:
   schedule:
-    - cron: '*/4 * * * *'  # Alle 4 Minuten für Überlappungsschutz
-    - cron: '*/9 * * * *'  # Backup-Trigger alle 9 Minuten
+    - cron: '*/4 * * * *'  # Primärer Trigger
+    - cron: '*/9 * * * *'  # Backup-Trigger
   workflow_dispatch:
+
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true  # Stoppt überlappende Läufe
 
 permissions:
   contents: write
-  actions: read  # Für Cache-Zugriff
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 5  # Verhindert Hänger
+    timeout-minutes: 5
 
     steps:
       - name: Code auschecken
@@ -21,14 +24,6 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-
-      - name: Lockfile erstellen
-        run: echo "${{ github.run_id }}" > .github/.lock
-
-      - name: Parallelitätskontrolle
-        uses: nrwl/workspace-lock@v1
-        with:
-          path: .github/.lock
 
       - name: Tracking-Dateien initialisieren
         run: |
@@ -50,7 +45,7 @@ jobs:
           cache: 'pip'
 
       - name: Abhängigkeiten
-        run: pip install requests python-dotenv
+        run: pip install requests
 
       - name: Bot-Lauf mit Wiederholung
         env:
@@ -63,24 +58,21 @@ jobs:
           for i in {1..3}; do
             python surreal_notify.py
             if [ $? -eq 0 ]; then
-              break
-            else
-              echo "Versuch $i fehlgeschlagen, wiederhole in 30s..."
-              sleep 30
+              exit 0
             fi
+            echo "Versuch $i fehlgeschlagen, wiederhole in 15s..."
+            sleep 15
           done
+          exit 1
 
-      - name: Commit-Sicherung
-        if: always()
+      - name: Änderungen committen
+        if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "GitHub Bot"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.email "actions@github.com"
           git add -A
-          git commit -m "Notfall-Backup: ${{ github.run_id }}" || echo "Keine Änderungen"
-          git push origin HEAD:main || echo "Push fehlgeschlagen"
-          
-      - name: Lockfile entfernen
-        if: always()
-        run: rm -f .github/.lock
+          git commit -m "Automatisches Update [skip ci]" || echo "Keine Änderungen"
+          git pull --rebase
+          git push origin HEAD:main
