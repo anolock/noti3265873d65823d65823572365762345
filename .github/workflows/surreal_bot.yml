@@ -2,13 +2,12 @@ name: Surreal Notifier
 
 on:
   schedule:
-    - cron: '*/4 * * * *'  # Primärer Trigger
-    - cron: '*/9 * * * *'  # Backup-Trigger
+    - cron: '*/5 * * * *'  # Alle 5 Minuten
   workflow_dispatch:
 
 concurrency: 
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true  # Stoppt überlappende Läufe
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -25,45 +24,41 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Tracking-Dateien initialisieren
-        run: |
-          mkdir -p db
-          [ -f db/processed_releases.json ] || echo '{"processed":[]}' > db/processed_releases.json
-          [ -f db/last_telegram_update.txt ] || echo "0" > db/last_telegram_update.txt
-
-      - name: Cache für Datenbanken
-        uses: actions/cache@v3
-        with:
-          path: db/
-          key: db-${{ hashFiles('db/processed_releases.json', 'db/last_telegram_update.txt') }}
-          restore-keys: db-
-
-      - name: Python-Umgebung
+      - name: Python 3.10 installieren
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
-          cache: 'pip'
 
-      - name: Abhängigkeiten
+      - name: Abhängigkeiten installieren
         run: pip install requests
 
-      - name: Bot-Lauf mit Wiederholung
+      - name: Datenbank initialisieren
+        run: |
+          mkdir -p db
+          if [ ! -f db/processed_releases.json ]; then
+            echo '{"processed": []}' > db/processed_releases.json
+          fi
+          if [ ! -f db/last_telegram_update.txt ]; then
+            echo "0" > db/last_telegram_update.txt
+          fi
+
+      - name: Cache laden
+        uses: actions/cache@v3
+        with:
+          path: |
+            db/processed_releases.json
+            db/last_telegram_update.txt
+          key: db-${{ hashFiles('db/processed_releases.json', 'db/last_telegram_update.txt') }}
+          restore-keys: db-
+
+      - name: Bot ausführen
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          for i in {1..3}; do
-            python surreal_notify.py
-            if [ $? -eq 0 ]; then
-              exit 0
-            fi
-            echo "Versuch $i fehlgeschlagen, wiederhole in 15s..."
-            sleep 15
-          done
-          exit 1
+        run: python surreal_notify.py
 
       - name: Änderungen committen
         if: success()
@@ -72,7 +67,7 @@ jobs:
         run: |
           git config --global user.name "GitHub Bot"
           git config --global user.email "actions@github.com"
-          git add -A
-          git commit -m "Automatisches Update [skip ci]" || echo "Keine Änderungen"
+          git add db/
+          git commit -m "Automatisches Update: $(date +'%Y-%m-%d %H:%M')" || echo "Keine Änderungen"
           git pull --rebase
           git push origin HEAD:main
