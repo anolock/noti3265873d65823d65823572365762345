@@ -3,11 +3,7 @@ name: Surreal Notifier
 on:
   schedule:
     - cron: '*/5 * * * *'  # Alle 5 Minuten
-  workflow_dispatch:
-
-concurrency: 
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  workflow_dispatch:  # Optional für manuellen Start
 
 permissions:
   contents: write
@@ -15,7 +11,7 @@ permissions:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 5  # Verhindert Hänger
 
     steps:
       - name: Code auschecken
@@ -41,15 +37,6 @@ jobs:
           if [ ! -f db/last_telegram_update.txt ]; then
             echo "0" > db/last_telegram_update.txt
           fi
-
-      - name: Cache laden
-        uses: actions/cache@v3
-        with:
-          path: |
-            db/processed_releases.json
-            db/last_telegram_update.txt
-          key: db-${{ hashFiles('db/processed_releases.json', 'db/last_telegram_update.txt') }}
-          restore-keys: db-
 
       - name: Bot ausführen
         env:
